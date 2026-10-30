@@ -68,6 +68,38 @@
         "title": "未読に戻す",
         "category": "Review Notes",
         "icon": "$(eye-closed)"
+      },
+      {
+        "command": "reviewNotes.nextCard",
+        "title": "次のカード",
+        "category": "Review Notes"
+      },
+      {
+        "command": "reviewNotes.prevCard",
+        "title": "前のカード",
+        "category": "Review Notes"
+      },
+      {
+        "command": "reviewNotes.nextUnread",
+        "title": "次の未読カード",
+        "category": "Review Notes"
+      },
+      {
+        "command": "reviewNotes.hideRead",
+        "title": "既読を隠す",
+        "category": "Review Notes",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "reviewNotes.showRead",
+        "title": "既読も表示",
+        "category": "Review Notes",
+        "icon": "$(filter-filled)"
+      },
+      {
+        "command": "reviewNotes.revealCard",
+        "title": "カードを開く",
+        "category": "Review Notes"
       }
     ],
     "menus": {
@@ -94,6 +126,18 @@
         },
         {
           "command": "reviewNotes.markUnread",
+          "when": "false"
+        },
+        {
+          "command": "reviewNotes.revealCard",
+          "when": "false"
+        },
+        {
+          "command": "reviewNotes.hideRead",
+          "when": "false"
+        },
+        {
+          "command": "reviewNotes.showRead",
           "when": "false"
         }
       ],
@@ -129,6 +173,26 @@
           "command": "reviewNotes.reopen",
           "group": "inline@2",
           "when": "commentController == review-notes && commentThread =~ /^resolved/"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "reviewNotes.hideRead",
+          "group": "navigation",
+          "when": "view == reviewNotes.cards && !reviewNotes.hidingRead"
+        },
+        {
+          "command": "reviewNotes.showRead",
+          "group": "navigation",
+          "when": "view == reviewNotes.cards && reviewNotes.hidingRead"
+        }
+      ]
+    },
+    "views": {
+      "scm": [
+        {
+          "id": "reviewNotes.cards",
+          "name": "Review Notes"
         }
       ]
     }

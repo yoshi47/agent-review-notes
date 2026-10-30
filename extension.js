@@ -2,6 +2,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 const vscode = require('vscode')
 
+const nav = require('./nav')
 const store = require('./store')
 
 const { Expanded, Collapsed } = vscode.CommentThreadCollapsibleState
@@ -240,8 +241,161 @@ function activate(ctx) {
       onThread(t, 'unread'),
     ),
   )
+  setupCards(ctx)
   for (const folder of vscode.workspace.workspaceFolders ?? [])
     addFolder(folder)
+}
+
+function activeRepo() {
+  const editor = vscode.window.activeTextEditor
+  const repo = editor && repoForUri(editor.document.uri)
+  if (repo) {
+    const cursor = {
+      path: store.relPath(repo.base, editor.document.uri.fsPath),
+      line: editor.selection.active.line + 1,
+    }
+    return { repo, cursor }
+  }
+  const withCards = [...repos.values()].find((r) => nav.cards(r.threads).length)
+  return withCards && { repo: withCards, cursor: undefined }
+}
+
+function go(dir, opts, markLeft) {
+  const here = activeRepo()
+  if (!here) return
+  const { repo, cursor } = here
+  const current = nav.currentCard(repo.threads, cursor, repo.last)
+  const target = nav.step(repo.threads, current, dir, opts)
+  if (!target)
+    return vscode.window.setStatusBarMessage(
+      'Review Notes: この先にカードはありません',
+      3000,
+    )
+  const left = nav.cards(repo.threads).find((t) => t.card === current)
+  if (markLeft && left && !left.read)
+    write(repo, [{ type: 'read', by: 'human', thread: left.id }])
+  repo.last = target.card
+  reveal(repo, target.id)
+  if (markLeft && left && !left.read) render(repo)
+}
+
+function setupCards(ctx) {
+  let hidingRead = false
+  const changed = new vscode.EventEmitter()
+  const tree = vscode.window.createTreeView('reviewNotes.cards', {
+    manageCheckboxStateManually: true,
+    treeDataProvider: {
+      onDidChangeTreeData: changed.event,
+      getChildren: () =>
+        [...repos.values()].flatMap((repo) =>
+          nav
+            .cards(repo.threads)
+            .filter((t) => !hidingRead || !t.read)
+            .map((t) => ({ repo, t })),
+        ),
+      getTreeItem: ({ repo, t }) => {
+        const head = (t.body ?? '')
+          .replace(/\s+/g, ' ')
+          .replace(/^#+ /, '')
+          .slice(0, 40)
+        const item = new vscode.TreeItem(
+          `#${t.card} ${t.path}:L${t.line} — ${head}`,
+        )
+        item.checkboxState = t.read
+          ? vscode.TreeItemCheckboxState.Checked
+          : vscode.TreeItemCheckboxState.Unchecked
+        item.command = {
+          command: 'reviewNotes.revealCard',
+          title: '開く',
+          arguments: [repo.log, t.id],
+        }
+        return item
+      },
+    },
+  })
+  const decorationsChanged = new vscode.EventEmitter()
+  const status = vscode.window.createStatusBarItem(
+    vscode.StatusBarAlignment.Left,
+    10,
+  )
+  status.command = 'reviewNotes.nextUnread'
+  const refresh = () => {
+    changed.fire()
+    decorationsChanged.fire(undefined)
+    let unread = 0
+    let total = 0
+    for (const r of repos.values()) {
+      const c = nav.counts(r.threads)
+      unread += c.unread
+      total += c.total
+    }
+    status.text = `$(comment-discussion) カード 未読 ${unread} / 全 ${total}`
+    if (total) status.show()
+    else status.hide()
+  }
+  const setHiding = (v) => {
+    hidingRead = v
+    vscode.commands.executeCommand('setContext', 'reviewNotes.hidingRead', v)
+    changed.fire()
+  }
+  ctx.subscriptions.push(
+    tree,
+    changed,
+    status,
+    decorationsChanged,
+    rendered.event(refresh),
+    tree.onDidChangeCheckboxState((e) => {
+      const touched = new Set()
+      for (const [{ repo, t }, state] of e.items) {
+        const type =
+          state === vscode.TreeItemCheckboxState.Checked ? 'read' : 'unread'
+        if (write(repo, [{ type, by: 'human', thread: t.id }]))
+          touched.add(repo)
+      }
+      for (const repo of touched) render(repo)
+    }),
+    vscode.window.registerFileDecorationProvider({
+      onDidChangeFileDecorations: decorationsChanged.event,
+      provideFileDecoration(uri) {
+        const repo = repoForUri(uri)
+        const n =
+          repo &&
+          nav
+            .unreadByPath(repo.threads)
+            .get(store.relPath(repo.base, uri.fsPath))
+        // Badges longer than two characters are rejected by VS Code.
+        return n
+          ? {
+              badge: n > 99 ? '99' : String(n),
+              tooltip: `未読のカード ${n} 件`,
+            }
+          : undefined
+      },
+    }),
+    vscode.commands.registerCommand('reviewNotes.revealCard', (log, id) => {
+      const repo = repos.get(log)
+      const t = repo?.threads.get(id)
+      if (!t) return
+      repo.last = t.card
+      reveal(repo, id)
+    }),
+    vscode.commands.registerCommand('reviewNotes.nextCard', () =>
+      go(1, {}, true),
+    ),
+    vscode.commands.registerCommand('reviewNotes.prevCard', () =>
+      go(-1, {}, false),
+    ),
+    vscode.commands.registerCommand('reviewNotes.nextUnread', () =>
+      go(1, { unreadOnly: true, wrap: true }, false),
+    ),
+    vscode.commands.registerCommand('reviewNotes.hideRead', () =>
+      setHiding(true),
+    ),
+    vscode.commands.registerCommand('reviewNotes.showRead', () =>
+      setHiding(false),
+    ),
+  )
+  refresh()
 }
 
 function deactivate() {
