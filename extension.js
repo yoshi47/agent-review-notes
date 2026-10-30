@@ -36,14 +36,14 @@ function toComments(t) {
     author:
       c.by === 'agent'
         ? { name: 'AI', iconPath: vscode.Uri.joinPath(context.extensionUri, 'media', 'ai.svg') }
-        : { name: 'あなた', iconPath: vscode.Uri.joinPath(context.extensionUri, 'media', 'you.svg') },
+        : { name: 'You', iconPath: vscode.Uri.joinPath(context.extensionUri, 'media', 'you.svg') },
     timestamp: new Date(c.at),
   }))
 }
 
 function label(t) {
-  if (t.card !== undefined) return `カード ${t.card}`
-  if (!t.resolved && store.lastBy(t) === 'human') return 'AI の返信待ち'
+  if (t.card !== undefined) return `Card ${t.card}`
+  if (!t.resolved && store.lastBy(t) === 'human') return 'Waiting for AI'
   return undefined
 }
 
@@ -132,9 +132,9 @@ async function notify() {
   const t = repo.threads.get(threadId)
   const message =
     items.length > 1 || !t
-      ? `AI が ${items.length} 件書き込みました`
-      : `AI が ${t.path}:${t.line} に${e.type === 'reply' ? '返信' : 'コメント'}しました`
-  if ((await vscode.window.showInformationMessage(message, '開く')) === '開く')
+      ? `AI wrote ${items.length} comments`
+      : `AI ${e.type === 'reply' ? 'replied' : 'commented'} on ${t.path}:${t.line}`
+  if ((await vscode.window.showInformationMessage(message, 'Open')) === 'Open')
     reveal(repo, threadId)
 }
 
@@ -170,7 +170,7 @@ function write(repo, events) {
     return store.append(repo.log, events)
   } catch (e) {
     vscode.window.showErrorMessage(
-      `Review Notes: 書き込めませんでした（${e.message}）`,
+      `Review Notes: could not write (${e.message})`,
     )
     return undefined
   }
@@ -209,7 +209,7 @@ function activate(ctx) {
     'review-notes',
     'Review Notes',
   )
-  controller.options = { placeHolder: '問いを書く（Cmd+Enter で送信）' }
+  controller.options = { placeHolder: 'Ask a question (Cmd+Enter to send)' }
   controller.commentingRangeProvider = {
     provideCommentingRanges(doc) {
       if (!repoForUri(doc.uri)) return []
@@ -290,7 +290,7 @@ function go(dir, opts, markLeft) {
   const target = nav.step(repo.threads, current, dir, opts)
   if (!target)
     return vscode.window.setStatusBarMessage(
-      'Review Notes: この先にカードはありません',
+      'Review Notes: no more cards',
       3000,
     )
   const left = nav.cards(repo.threads).find((t) => t.card === current)
@@ -328,7 +328,7 @@ function setupCards(ctx) {
           : vscode.TreeItemCheckboxState.Unchecked
         item.command = {
           command: 'reviewNotes.revealCard',
-          title: '開く',
+          title: 'Open',
           arguments: [repo.log, t.id],
         }
         return item
@@ -351,7 +351,7 @@ function setupCards(ctx) {
       unread += c.unread
       total += c.total
     }
-    status.text = `$(comment-discussion) カード 未読 ${unread} / 全 ${total}`
+    status.text = `$(comment-discussion) Cards ${unread} unread / ${total}`
     if (total) status.show()
     else status.hide()
   }
@@ -389,7 +389,7 @@ function setupCards(ctx) {
         return n
           ? {
               badge: n > 99 ? '99' : String(n),
-              tooltip: `未読のカード ${n} 件`,
+              tooltip: `${n} unread card${n === 1 ? '' : 's'}`,
             }
           : undefined
       },

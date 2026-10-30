@@ -1,7 +1,7 @@
 {
   "name": "review-notes",
   "displayName": "Review Notes",
-  "description": "AI と人が、ローカルのコードにスレッドで書き込むレビュー用コメント（GitHub には書かない）",
+  "description": "Local review comment threads shared by an AI agent and you (nothing is written to GitHub)",
   "version": "0.0.1",
   "publisher": "yoshi47",
   "private": true,
@@ -24,81 +24,81 @@
         "reviewNotes.openInDiff": {
           "type": "boolean",
           "default": true,
-          "description": "スレッドへ移動するとき、ソース管理の差分で開く"
+          "description": "Open the Source Control diff when jumping to a thread"
         },
         "reviewNotes.notifyDelaySeconds": {
           "type": "number",
           "default": 2,
           "minimum": 0,
-          "description": "AI の書き込みが止んでから通知するまでの秒数"
+          "description": "Seconds of quiet after AI writes before notifying"
         }
       }
     },
     "commands": [
       {
         "command": "reviewNotes.create",
-        "title": "送信",
+        "title": "Comment",
         "category": "Review Notes"
       },
       {
         "command": "reviewNotes.reply",
-        "title": "返信",
+        "title": "Reply",
         "category": "Review Notes"
       },
       {
         "command": "reviewNotes.resolve",
-        "title": "解決",
+        "title": "Resolve",
         "category": "Review Notes",
         "icon": "$(check)"
       },
       {
         "command": "reviewNotes.reopen",
-        "title": "再開",
+        "title": "Reopen",
         "category": "Review Notes",
         "icon": "$(debug-restart)"
       },
       {
         "command": "reviewNotes.markRead",
-        "title": "既読にする",
+        "title": "Mark as Read",
         "category": "Review Notes",
         "icon": "$(eye)"
       },
       {
         "command": "reviewNotes.markUnread",
-        "title": "未読に戻す",
+        "title": "Mark as Unread",
         "category": "Review Notes",
         "icon": "$(eye-closed)"
       },
       {
         "command": "reviewNotes.nextCard",
-        "title": "次のカード",
+        "title": "Next Card",
         "category": "Review Notes"
       },
       {
         "command": "reviewNotes.prevCard",
-        "title": "前のカード",
+        "title": "Previous Card",
         "category": "Review Notes"
       },
       {
         "command": "reviewNotes.nextUnread",
-        "title": "次の未読カード",
+        "title": "Next Unread Card",
         "category": "Review Notes"
       },
       {
         "command": "reviewNotes.hideRead",
-        "title": "既読を隠す",
+        "title": "Hide Read Cards",
         "category": "Review Notes",
         "icon": "$(filter)"
       },
       {
         "command": "reviewNotes.showRead",
-        "title": "既読も表示",
+        "title": "Show Read Cards",
         "category": "Review Notes",
         "icon": "$(filter-filled)"
       },
       {
         "command": "reviewNotes.revealCard",
-        "title": "カードを開く",
+        "title": "Open Card",
         "category": "Review Notes"
       }
     ],
