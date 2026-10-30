@@ -56,7 +56,12 @@ function expand(native) {
 function render(repo) {
   const events = store.read(repo.log)
   const threads = store.fold(events)
+  // One malformed thread (hand-edited log) must not stop the rest from showing.
   for (const [id, t] of threads) {
+    if (typeof t.path !== 'string' || !Number.isInteger(t.line) || t.line < 1) {
+      threads.delete(id)
+      continue
+    }
     let n = repo.native.get(id)
     const sig = [t.id, ...t.replies.map((r) => r.id)].join(',')
     if (!n) {
@@ -127,12 +132,18 @@ async function reveal(repo, id) {
   const n = repo.native.get(id)
   if (!t || !n) return
   const uri = uriOf(repo, t.path)
+  const opened = () =>
+    vscode.window.activeTextEditor?.document.uri.fsPath === uri.fsPath
   try {
     if (config().get('openInDiff', true))
       await vscode.commands.executeCommand('git.openChange', uri)
-    else await vscode.window.showTextDocument(uri)
+  } catch {}
+  // git.openChange silently opens nothing for a file with no change (or before
+  // the git extension has scanned the repo), so fall back to the plain editor.
+  try {
+    if (!opened()) await vscode.window.showTextDocument(uri)
   } catch {
-    await vscode.window.showTextDocument(uri)
+    return
   }
   const editor = vscode.window.activeTextEditor
   if (editor && editor.document.uri.fsPath === uri.fsPath) {

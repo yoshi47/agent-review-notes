@@ -74,7 +74,7 @@ function main() {
               body: e.body,
             }) - 1,
           )
-      } else if (!e.path || !Number.isInteger(e.line) || e.line < 1) {
+      } else if (typeof e.path !== 'string' || !e.path || !Number.isInteger(e.line) || e.line < 1) {
         results.push({ error: 'entry needs path and a 1-based line' })
       } else if (!fs.existsSync(store.absPath(repo.top, e.path))) {
         results.push({ error: `no file ${e.path}` })

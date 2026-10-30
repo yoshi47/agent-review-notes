@@ -160,3 +160,10 @@ test('usage errors exit 2', () => {
   assert.equal(run(d, ['post'], '{}').status, 2)
   assert.equal(run(d, ['bogus']).status, 2)
 })
+
+test('a non-string path is an entry error, not a crash', () => {
+  const d = repo()
+  const r = run(d, ['post'], [{ path: 5, line: 1, body: 'x' }])
+  assert.equal(r.status, 1, r.stderr)
+  assert.ok(r.out[0].error)
+})
