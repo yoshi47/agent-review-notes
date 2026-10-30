@@ -1,0 +1,136 @@
+{
+  "name": "review-notes",
+  "displayName": "Review Notes",
+  "description": "AI と人が、ローカルのコードにスレッドで書き込むレビュー用コメント（GitHub には書かない）",
+  "version": "0.0.1",
+  "publisher": "yoshi47",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yoshi47/review-notes"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "main": "./extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "configuration": {
+      "title": "Review Notes",
+      "properties": {
+        "reviewNotes.openInDiff": {
+          "type": "boolean",
+          "default": true,
+          "description": "スレッドへ移動するとき、ソース管理の差分で開く"
+        },
+        "reviewNotes.notifyDelaySeconds": {
+          "type": "number",
+          "default": 2,
+          "minimum": 0,
+          "description": "AI の書き込みが止んでから通知するまでの秒数"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "reviewNotes.create",
+        "title": "送信",
+        "category": "Review Notes"
+      },
+      {
+        "command": "reviewNotes.reply",
+        "title": "返信",
+        "category": "Review Notes"
+      },
+      {
+        "command": "reviewNotes.resolve",
+        "title": "解決",
+        "category": "Review Notes",
+        "icon": "$(check)"
+      },
+      {
+        "command": "reviewNotes.reopen",
+        "title": "再開",
+        "category": "Review Notes",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "reviewNotes.markRead",
+        "title": "既読にする",
+        "category": "Review Notes",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "reviewNotes.markUnread",
+        "title": "未読に戻す",
+        "category": "Review Notes",
+        "icon": "$(eye-closed)"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "reviewNotes.create",
+          "when": "false"
+        },
+        {
+          "command": "reviewNotes.reply",
+          "when": "false"
+        },
+        {
+          "command": "reviewNotes.resolve",
+          "when": "false"
+        },
+        {
+          "command": "reviewNotes.reopen",
+          "when": "false"
+        },
+        {
+          "command": "reviewNotes.markRead",
+          "when": "false"
+        },
+        {
+          "command": "reviewNotes.markUnread",
+          "when": "false"
+        }
+      ],
+      "comments/commentThread/context": [
+        {
+          "command": "reviewNotes.create",
+          "group": "inline",
+          "when": "commentController == review-notes && commentThreadIsEmpty"
+        },
+        {
+          "command": "reviewNotes.reply",
+          "group": "inline",
+          "when": "commentController == review-notes && !commentThreadIsEmpty"
+        }
+      ],
+      "comments/commentThread/title": [
+        {
+          "command": "reviewNotes.markRead",
+          "group": "inline@1",
+          "when": "commentController == review-notes && commentThread =~ /-card-unread$/"
+        },
+        {
+          "command": "reviewNotes.markUnread",
+          "group": "inline@1",
+          "when": "commentController == review-notes && commentThread =~ /-card-read$/"
+        },
+        {
+          "command": "reviewNotes.resolve",
+          "group": "inline@2",
+          "when": "commentController == review-notes && commentThread =~ /^unresolved/"
+        },
+        {
+          "command": "reviewNotes.reopen",
+          "group": "inline@2",
+          "when": "commentController == review-notes && commentThread =~ /^resolved/"
+        }
+      ]
+    }
+  }
+}
