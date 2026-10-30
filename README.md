@@ -8,4 +8,4 @@ AI（review-companion）と人が、ローカルのコードにスレッドで�
 - 1ファイルの中のスレッド間の移動は、VS Code 標準の Alt+F9 / Shift+Alt+F9
 - 同じ worktree を2つの窓で開くと、通知が両方に出る
 
-入れ方: `npx @vscode/vsce package --no-dependencies -o "$TMPDIR/review-notes.vsix" && code --install-extension "$TMPDIR/review-notes.vsix" --force`
+入れ方: `npx @vscode/vsce package --no-dependencies -o "$TMPDIR/review-notes.vsix" && code --install-extension "$TMPDIR/review-notes.vsix" --force`（使うプロファイルごとに `--profile ts` などを付けて入れる）
