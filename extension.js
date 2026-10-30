@@ -53,6 +53,11 @@ function expand(native) {
   native.collapsibleState = Expanded
 }
 
+function collapse(native) {
+  native.collapsibleState = Expanded
+  native.collapsibleState = Collapsed
+}
+
 function render(repo) {
   const events = store.read(repo.log)
   const threads = store.fold(events)
@@ -77,6 +82,9 @@ function render(repo) {
       const prev = repo.threads.get(id)
       if (prev && agentReplies(t) > agentReplies(prev)) expand(n)
     }
+    // A card just marked read is done: fold it so the next one stands out.
+    const was = repo.threads.get(id)
+    if (was && !was.read && t.read) collapse(n)
     repo.sig.set(id, sig)
     const card =
       t.card === undefined ? '' : t.read ? '-card-read' : '-card-unread'
