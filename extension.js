@@ -33,7 +33,10 @@ function toComments(t) {
   return [t, ...t.replies].map((c) => ({
     body: new vscode.MarkdownString(c.body ?? ''),
     mode: vscode.CommentMode.Preview,
-    author: { name: c.by === 'agent' ? 'AI' : 'あなた' },
+    author:
+      c.by === 'agent'
+        ? { name: 'AI', iconPath: vscode.Uri.joinPath(context.extensionUri, 'media', 'ai.svg') }
+        : { name: 'あなた', iconPath: vscode.Uri.joinPath(context.extensionUri, 'media', 'you.svg') },
     timestamp: new Date(c.at),
   }))
 }
