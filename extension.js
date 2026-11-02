@@ -469,6 +469,8 @@ module.exports = {
   deactivate,
   repos,
   rendered,
+  locate,
+  uriOf,
   reveal,
   render,
   write,
