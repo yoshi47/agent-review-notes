@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 // review-notes --workspace <dir> post <entries.json>
-//   entries: [{path, line, body, card?} | {reply_to, body}]; written as agent
-//   in one append. stdout: [{id} | {error}] in input order
+//   entries: [{path, line, body, card?, side?} | {reply_to, body}]; written as
+//   agent in one append. side 'old' targets the HEAD side of the diff.
+//   stdout: [{id} | {error}] in input order
 // review-notes --workspace <dir> focus --thread <id>
 // review-notes --workspace <dir> list [--unanswered]
 // review-notes --workspace <dir> archive --label <label>
 //
 // exit: 0 = ok, 1 = some entries or the target failed, 2 = usage
 
+const { execFileSync } = require('node:child_process')
 const fs = require('node:fs')
 const path = require('node:path')
 const { parseArgs } = require('node:util')
@@ -16,6 +18,19 @@ const store = require('../store')
 
 const USAGE =
   'usage: review-notes --workspace <dir> post <entries.json> | focus --thread <id> | list [--unanswered] | archive --label <label>'
+
+// The old side of the review diff is HEAD (the merge-base after the mixed
+// reset), so a file deleted by the PR is still a valid target there.
+function atHead(top, rel) {
+  try {
+    execFileSync('git', ['-C', top, 'cat-file', '-e', `HEAD:${rel}`], {
+      stdio: 'ignore',
+    })
+    return true
+  } catch {
+    return false
+  }
+}
 
 function fail(code, message) {
   console.error(`review-notes: ${message}`)
@@ -76,8 +91,10 @@ function main() {
           )
       } else if (typeof e.path !== 'string' || !e.path || !Number.isInteger(e.line) || e.line < 1) {
         results.push({ error: 'entry needs path and a 1-based line' })
-      } else if (!fs.existsSync(store.absPath(repo.top, e.path))) {
-        results.push({ error: `no file ${e.path}` })
+      } else if (e.side !== undefined && e.side !== 'old' && e.side !== 'new') {
+        results.push({ error: `side must be "old" or "new", not ${JSON.stringify(e.side)}` })
+      } else if (e.side === 'old' ? !atHead(repo.top, e.path) : !fs.existsSync(store.absPath(repo.top, e.path))) {
+        results.push({ error: `no file ${e.path}${e.side === 'old' ? ' at HEAD' : ''}` })
       } else {
         const add = {
           type: 'add',
@@ -86,6 +103,7 @@ function main() {
           line: e.line,
           body: e.body,
         }
+        if (e.side === 'old') add.side = 'old'
         if (e.card !== undefined) add.card = e.card
         results.push(events.push(add) - 1)
       }
