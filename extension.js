@@ -14,14 +14,49 @@ let pending = []
 let timer
 
 const lineRange = (line) => new vscode.Range(line - 1, 0, line - 1, 0)
-const uriOf = (repo, rel) => vscode.Uri.file(store.absPath(repo.base, rel))
+const fileUri = (repo, rel) => vscode.Uri.file(store.absPath(repo.base, rel))
 const config = () => vscode.workspace.getConfiguration('reviewNotes')
+const where = (t) => `${t.path}:${t.line}${t.side === 'old' ? ' (old)' : ''}`
 
-function repoForUri(uri) {
-  if (uri.scheme !== 'file') return undefined
-  return [...repos.values()].find((r) =>
-    uri.fsPath.startsWith(r.base + path.sep),
+// The old side is whatever the git extension opens for the working-tree diff:
+// ref '~' (index) on the left for a modified file, 'HEAD' alone for a deleted
+// one. Both are the merge-base in a review worktree. Other refs (history,
+// merge stages) are not the review's old side.
+const OLD_REFS = new Set(['~', 'HEAD'])
+
+// Threads only show on a document whose URI matches exactly, so this has to
+// rebuild the git extension's own toGitUri() for the ref it would pick.
+function uriOf(repo, t) {
+  const file = fileUri(repo, t.path)
+  if (t.side !== 'old') return file
+  const ref = fs.existsSync(file.fsPath) ? '~' : 'HEAD'
+  return file.with({
+    scheme: 'git',
+    query: JSON.stringify({ path: file.fsPath, ref }),
+  })
+}
+
+const sameUri = (a, b) =>
+  a.scheme === b.scheme && a.fsPath === b.fsPath && a.query === b.query
+
+function locate(uri) {
+  let fsPath = uri.fsPath
+  let side = 'new'
+  if (uri.scheme === 'git') {
+    let q
+    try {
+      q = JSON.parse(uri.query)
+    } catch {
+      return undefined
+    }
+    if (!OLD_REFS.has(q?.ref) || typeof q.path !== 'string') return undefined
+    fsPath = q.path
+    side = 'old'
+  } else if (uri.scheme !== 'file') return undefined
+  const repo = [...repos.values()].find((r) =>
+    fsPath.startsWith(r.base + path.sep),
   )
+  return repo && { repo, path: store.relPath(repo.base, fsPath), side }
 }
 
 function idOf(repo, native) {
@@ -74,7 +109,7 @@ function render(repo) {
     const sig = [t.id, ...t.replies.map((r) => r.id)].join(',')
     if (!n) {
       n = controller.createCommentThread(
-        uriOf(repo, t.path),
+        uriOf(repo, t),
         lineRange(t.line),
         toComments(t),
       )
@@ -133,7 +168,7 @@ async function notify() {
   const message =
     items.length > 1 || !t
       ? `AI wrote ${items.length} comments`
-      : `AI ${e.type === 'reply' ? 'replied' : 'commented'} on ${t.path}:${t.line}`
+      : `AI ${e.type === 'reply' ? 'replied' : 'commented'} on ${where(t)}`
   if ((await vscode.window.showInformationMessage(message, 'Open')) === 'Open')
     reveal(repo, threadId)
 }
@@ -142,12 +177,19 @@ async function reveal(repo, id) {
   const t = repo.threads.get(id)
   const n = repo.native.get(id)
   if (!t || !n) return
-  const uri = uriOf(repo, t.path)
+  const uri = uriOf(repo, t)
+  // The left side of a diff never becomes the active editor, so look through
+  // the visible ones too (the active one first, in case of splits).
   const opened = () =>
-    vscode.window.activeTextEditor?.document.uri.fsPath === uri.fsPath
+    [vscode.window.activeTextEditor, ...vscode.window.visibleTextEditors].find(
+      (e) => e && sameUri(e.document.uri, uri),
+    )
   try {
     if (config().get('openInDiff', true))
-      await vscode.commands.executeCommand('git.openChange', uri)
+      await vscode.commands.executeCommand(
+        'git.openChange',
+        fileUri(repo, t.path),
+      )
   } catch {}
   // git.openChange silently opens nothing for a file with no change (or before
   // the git extension has scanned the repo), so fall back to the plain editor.
@@ -156,8 +198,8 @@ async function reveal(repo, id) {
   } catch {
     return
   }
-  const editor = vscode.window.activeTextEditor
-  if (editor && editor.document.uri.fsPath === uri.fsPath) {
+  const editor = opened()
+  if (editor) {
     const r = lineRange(t.line)
     editor.selection = new vscode.Selection(r.start, r.start)
     editor.revealRange(r, vscode.TextEditorRevealType.InCenterIfOutsideViewport)
@@ -177,7 +219,7 @@ function write(repo, events) {
 }
 
 function onThread(native, type) {
-  const repo = native && repoForUri(native.uri)
+  const repo = native && locate(native.uri)?.repo
   const id = repo && idOf(repo, native)
   if (!id) return
   if (write(repo, [{ type, by: 'human', thread: id }])) render(repo)
@@ -212,7 +254,7 @@ function activate(ctx) {
   controller.options = { placeHolder: 'Ask a question (Cmd+Enter to send)' }
   controller.commentingRangeProvider = {
     provideCommentingRanges(doc) {
-      if (!repoForUri(doc.uri)) return []
+      if (!locate(doc.uri)) return []
       return [new vscode.Range(0, 0, Math.max(doc.lineCount - 1, 0), 0)]
     },
   }
@@ -220,18 +262,18 @@ function activate(ctx) {
     controller,
     rendered,
     vscode.commands.registerCommand('reviewNotes.create', (reply) => {
-      const repo = repoForUri(reply.thread.uri)
-      if (!repo || !reply.text.trim()) return
-      const [e] =
-        write(repo, [
-          {
-            type: 'add',
-            by: 'human',
-            path: store.relPath(repo.base, reply.thread.uri.fsPath),
-            line: reply.thread.range.start.line + 1,
-            body: reply.text,
-          },
-        ]) ?? []
+      const at = locate(reply.thread.uri)
+      if (!at || !reply.text.trim()) return
+      const { repo } = at
+      const add = {
+        type: 'add',
+        by: 'human',
+        path: at.path,
+        line: reply.thread.range.start.line + 1,
+        body: reply.text,
+      }
+      if (at.side === 'old') add.side = 'old'
+      const [e] = write(repo, [add]) ?? []
       if (!e) return
       // Keep VS Code's own thread: recreating it would apply the "AI's turn
       // is over" rule and collapse the question the user just wrote.
@@ -240,7 +282,7 @@ function activate(ctx) {
       render(repo)
     }),
     vscode.commands.registerCommand('reviewNotes.reply', (reply) => {
-      const repo = repoForUri(reply.thread.uri)
+      const repo = locate(reply.thread.uri)?.repo
       const id = repo && idOf(repo, reply.thread)
       if (!id || !reply.text.trim()) return
       if (
@@ -270,13 +312,14 @@ function activate(ctx) {
 
 function activeRepo() {
   const editor = vscode.window.activeTextEditor
-  const repo = editor && repoForUri(editor.document.uri)
-  if (repo) {
+  const at = editor && locate(editor.document.uri)
+  if (at) {
     const cursor = {
-      path: store.relPath(repo.base, editor.document.uri.fsPath),
+      path: at.path,
       line: editor.selection.active.line + 1,
+      side: at.side,
     }
-    return { repo, cursor }
+    return { repo: at.repo, cursor }
   }
   const withCards = [...repos.values()].find((r) => nav.cards(r.threads).length)
   return withCards && { repo: withCards, cursor: undefined }
@@ -321,7 +364,7 @@ function setupCards(ctx) {
           .replace(/^#+ /, '')
           .slice(0, 40)
         const item = new vscode.TreeItem(
-          `#${t.card} ${t.path}:L${t.line} — ${head}`,
+          `#${t.card} ${t.path}:L${t.line}${t.side === 'old' ? ' (old)' : ''} — ${head}`,
         )
         item.checkboxState = t.read
           ? vscode.TreeItemCheckboxState.Checked
@@ -379,12 +422,8 @@ function setupCards(ctx) {
     vscode.window.registerFileDecorationProvider({
       onDidChangeFileDecorations: decorationsChanged.event,
       provideFileDecoration(uri) {
-        const repo = repoForUri(uri)
-        const n =
-          repo &&
-          nav
-            .unreadByPath(repo.threads)
-            .get(store.relPath(repo.base, uri.fsPath))
+        const at = uri.scheme === 'file' && locate(uri)
+        const n = at && nav.unreadByPath(at.repo.threads).get(at.path)
         // Badges longer than two characters are rejected by VS Code.
         return n
           ? {

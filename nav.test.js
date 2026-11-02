@@ -27,6 +27,15 @@ test('currentCard prefers the card on the cursor line, then the last one reached
   assert.equal(nav.currentCard(threads, undefined, undefined), undefined)
 })
 
+test('currentCard tells the old side of a line from the new side', () => {
+  const both = new Map([
+    ['n', { id: 'n', path: 'a.ts', line: 5, card: 1, replies: [] }],
+    ['o', { id: 'o', path: 'a.ts', line: 5, card: 2, side: 'old', replies: [] }],
+  ])
+  assert.equal(nav.currentCard(both, { path: 'a.ts', line: 5, side: 'new' }), 1)
+  assert.equal(nav.currentCard(both, { path: 'a.ts', line: 5, side: 'old' }), 2)
+})
+
 test('step moves forward and back through card numbers', () => {
   const id = (t) => t?.id
   assert.equal(id(nav.step(threads, undefined, 1)), 'c1')

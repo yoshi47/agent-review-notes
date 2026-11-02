@@ -161,6 +161,48 @@ test('usage errors exit 2', () => {
   assert.equal(run(d, ['bogus']).status, 2)
 })
 
+function committed() {
+  const d = repo()
+  const git = (...a) => execFileSync('git', ['-C', d, ...a])
+  git('add', '-A')
+  git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'base')
+  return d
+}
+
+test('side old is kept, and needs the path at HEAD rather than on disk', () => {
+  const d = committed()
+  fs.rmSync(path.join(d, 'a b.ts'))
+  fs.writeFileSync(path.join(d, 'new.ts'), '')
+  const r = run(
+    d,
+    ['post'],
+    [
+      { path: 'a b.ts', line: 2, body: 'gone now', side: 'old' },
+      { path: 'new.ts', line: 1, body: 'not at HEAD', side: 'old' },
+      { path: '@x/f.ts', line: 1, body: 'new side', side: 'new' },
+    ],
+  )
+  assert.equal(r.status, 1, r.stderr)
+  assert.ok(r.out[0].id)
+  assert.ok(r.out[1].error)
+  assert.ok(r.out[2].id)
+  assert.deepEqual(
+    list(d).map((t) => [t.path, t.side]),
+    [
+      ['a b.ts', 'old'],
+      ['@x/f.ts', undefined],
+    ],
+  )
+})
+
+test('an unknown side is an entry error', () => {
+  const d = committed()
+  const r = run(d, ['post'], [{ path: 'a b.ts', line: 1, body: 'x', side: 'left' }])
+  assert.equal(r.status, 1, r.stderr)
+  assert.ok(r.out[0].error)
+  assert.equal(list(d).length, 0)
+})
+
 test('a non-string path is an entry error, not a crash', () => {
   const d = repo()
   const r = run(d, ['post'], [{ path: 5, line: 1, body: 'x' }])

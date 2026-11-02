@@ -10,7 +10,12 @@ const cards = (threads) =>
 function currentCard(threads, cursor, last) {
   const here =
     cursor &&
-    cards(threads).find((t) => t.path === cursor.path && t.line === cursor.line)
+    cards(threads).find(
+      (t) =>
+        t.path === cursor.path &&
+        t.line === cursor.line &&
+        (t.side === 'old') === (cursor.side === 'old'),
+    )
   return here ? here.card : last
 }
 
