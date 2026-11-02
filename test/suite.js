@@ -1,6 +1,8 @@
 // Runs inside the extension host (see run.js). What only a real VS Code can
 // tell: whether the URIs this extension builds for the old side are the ones
-// the git extension actually opens, since a thread shows only on an exact match.
+// the git extension actually opens, since a thread shows only on an exact match;
+// and whether the commands and the log watcher reach the real comment threads.
+// The tests share one log and run in order.
 
 const assert = require('node:assert/strict')
 const path = require('node:path')
@@ -93,6 +95,82 @@ test('reveal puts the cursor on the old-side line in the diff', async () => {
   await ext.reveal(repo, e.id)
   const left = await until('the old side of a.ts', () => gitEditor('a.ts'))
   assert.equal(left.selection.active.line, 3)
+})
+
+const last = () => store.read(repo.log).at(-1)
+
+test('the thread title buttons log resolve, reopen, read and unread', async () => {
+  const [e] = store.append(repo.log, [
+    { type: 'add', by: 'agent', path: 'a.ts', line: 2, body: 'y', card: 2 },
+  ])
+  ext.render(repo)
+  const n = repo.native.get(e.id)
+  const press = async (command, type, contextValue, state) => {
+    await vscode.commands.executeCommand(command, n)
+    assert.deepEqual(
+      [last().type, last().by, last().thread],
+      [type, 'human', e.id],
+    )
+    assert.equal(n.contextValue, contextValue)
+    assert.equal(n.state, state)
+  }
+  const { Resolved, Unresolved } = vscode.CommentThreadState
+  await press('reviewNotes.markRead', 'read', 'unresolved-card-read', Unresolved)
+  await press('reviewNotes.markUnread', 'unread', 'unresolved-card-unread', Unresolved)
+  await press('reviewNotes.resolve', 'resolve', 'resolved-card-unread', Resolved)
+  await press('reviewNotes.reopen', 'reopen', 'unresolved-card-unread', Unresolved)
+})
+
+test('a reply is logged as human, and a blank one is not logged', async () => {
+  const [e] = store.append(repo.log, [
+    { type: 'add', by: 'agent', path: 'a.ts', line: 3, body: 'z' },
+  ])
+  ext.render(repo)
+  const n = repo.native.get(e.id)
+  const before = store.read(repo.log).length
+  await vscode.commands.executeCommand('reviewNotes.reply', { thread: n, text: '  ' })
+  assert.equal(store.read(repo.log).length, before)
+  await vscode.commands.executeCommand('reviewNotes.reply', { thread: n, text: 'why?' })
+  assert.deepEqual(
+    [last().type, last().by, last().thread, last().body],
+    ['reply', 'human', e.id, 'why?'],
+  )
+  assert.equal(n.comments.length, 2)
+  assert.equal(n.label, 'Waiting for AI')
+})
+
+test('an AI reply appended to the log shows up through the file watcher', async () => {
+  const [e] = store.append(repo.log, [
+    { type: 'add', by: 'human', path: 'a.ts', line: 5, body: 'q' },
+  ])
+  ext.render(repo)
+  const n = repo.native.get(e.id)
+  assert.equal(n.label, 'Waiting for AI')
+  // No render() here: only the watcher on the log may pick this up.
+  store.append(repo.log, [{ type: 'reply', by: 'agent', thread: e.id, body: 'a' }])
+  await until('the reply to be shown', () => n.comments.length === 2)
+  assert.equal(n.label, undefined)
+  assert.equal(n.collapsibleState, vscode.CommentThreadCollapsibleState.Expanded)
+})
+
+test('next card marks the card being left as read and moves on', async () => {
+  // With no editor open, the current card is the last one reached.
+  await vscode.commands.executeCommand('workbench.action.closeAllEditors')
+  const [one, two] = [1, 2].map((c) =>
+    [...repo.threads.values()].find((t) => t.card === c),
+  )
+  assert.equal(one.read, false)
+  repo.last = 1
+  await vscode.commands.executeCommand('reviewNotes.nextCard')
+  assert.equal(repo.last, 2)
+  assert.equal(repo.threads.get(one.id).read, true)
+  await until('card 2 to be revealed', () =>
+    vscode.window.visibleTextEditors.find(
+      (e) =>
+        e.document.uri.toString() === file('a.ts').toString() &&
+        e.selection.active.line === two.line - 1,
+    ),
+  )
 })
 
 async function run() {
