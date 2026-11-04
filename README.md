@@ -1,12 +1,12 @@
 # Review Notes
 
-Read a pull request together with your AI agent, right on the diff in VS Code.
+Ask your AI coding agent about a change, right on the diff in VS Code.
 
-The agent walks you through the changes with numbered explanation cards. When something is unclear, you ask on that line. The agent answers in the same thread, and VS Code tells you when it does.
+You leave a question on a line. The agent answers in the same thread, and VS Code tells you when it does. The agent can also start threads itself, such as numbered cards that walk you through a pull request.
 
-- Cards in reading order: step through them with Next Card, and track which ones you have read
 - Questions on any line: start a thread on the new or the old side of the diff
 - Notifications: when the agent comments or replies, a notification takes you to the thread
+- Cards in reading order: step through the agent's cards with Next Card, and track which ones you have read
 - Works with any agent: the agent writes through a small bundled CLI that takes and returns JSON
 - No server: everything goes through one append-only file in the repository's git directory, so the agent can write even before VS Code is open
 
@@ -19,18 +19,12 @@ The review lives in `review-notes.jsonl` in the repository's git directory (`git
 - Your actions in VS Code (new threads, replies, resolve, read) are appended to the same file
 - Nothing is written to the working tree, and `git worktree remove` deletes the review with the worktree
 
-## Setting up a review
+## What you can comment on
 
-Threads are shown in the Source Control diff, which compares the working tree with `HEAD`. To make that diff show a pull request, check out the PR head and move `HEAD` back to the merge base without touching the files:
+Threads go on the Source Control diff, which compares the working tree with `HEAD`. Whatever shows there as uncommitted changes can be discussed.
 
-```sh
-git worktree add --detach ../review-123 <pr-head-sha>
-cd ../review-123
-git reset --mixed "$(git merge-base origin/main HEAD)"
-code .
-```
-
-The new side of the diff is then the PR, and the old side is the base. A separate worktree per review keeps your own checkout untouched.
+- Changes your agent just made: no setup. Open them in the Source Control view and ask on any line, then tell the agent to check its threads (see [the agent loop](#a-typical-agent-loop))
+- A pull request: prepare a worktree where the PR shows up as uncommitted changes against its base. How to prepare it is up to your agent or workflow; the extension only reads the diff
 
 ## Install
 
@@ -96,11 +90,22 @@ Exit codes:
 
 Put the body in the JSON file rather than in shell arguments, so quoting never breaks it.
 
-A typical loop for an agent:
+### A typical agent loop
 
-1. `post` the cards, then `focus` the first one
-2. Poll `list --unanswered` for your questions
-3. `post` a reply for each one
+1. Optionally, `post` cards and `focus` the first one
+2. Poll `list --unanswered` every few seconds. It returns the open threads where you wrote last
+3. `post` a reply to each one. The thread drops out of `list --unanswered` until you write again
+
+For example, to print a line whenever the set of unanswered threads changes:
+
+```sh
+prev=
+while sleep 5; do
+  cur=$(node "$CLI" --workspace . list --unanswered | jq -r 'map(.id + ":" + (.replies | length | tostring)) | join(",")')
+  [ -n "$cur" ] && [ "$cur" != "$prev" ] && echo "unanswered: $cur"
+  prev=$cur
+done
+```
 
 ## The log format
 
@@ -125,7 +130,7 @@ The state is rebuilt by reading the log from the top. Writers only append. A tra
 
 ## Limitations
 
-- Threads do not follow edits. A review worktree is meant to be read, not edited
+- Threads do not follow edits. A thread stays on the line number it was written on
 - Old-side threads show only in the Source Control diff of the working tree, not in other `git:` views such as file history
 - If the same worktree is open in two windows, both show the notification
 

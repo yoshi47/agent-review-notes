@@ -1,6 +1,6 @@
 // Runs test/suite.js inside a real VS Code (downloaded into .vscode-test/) on a
-// throwaway repository shaped like a review worktree: HEAD is the base and the
-// change is left unstaged, as after review-companion's mixed reset.
+// throwaway repository whose change against HEAD is left unstaged, so it shows
+// in the working-tree diff.
 
 const { execFileSync } = require('node:child_process')
 const fs = require('node:fs')
