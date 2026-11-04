@@ -20,8 +20,7 @@ const where = (t) => `${t.path}:${t.line}${t.side === 'old' ? ' (old)' : ''}`
 
 // The old side is whatever the git extension opens for the working-tree diff:
 // ref '~' (index) on the left for a modified file, 'HEAD' alone for a deleted
-// one. Both are the merge-base in a review worktree. Other refs (history,
-// merge stages) are not the review's old side.
+// one. Other refs (history, merge stages) are not part of that diff.
 const OLD_REFS = new Set(['~', 'HEAD'])
 
 // Threads only show on a document whose URI matches exactly, so this has to

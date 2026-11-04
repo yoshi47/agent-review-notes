@@ -19,8 +19,8 @@ const store = require('../store')
 const USAGE =
   'usage: review-notes --workspace <dir> post <entries.json> | focus --thread <id> | list [--unanswered] | archive --label <label>'
 
-// The old side of the review diff is HEAD (the merge-base after the mixed
-// reset), so a file deleted by the PR is still a valid target there.
+// The old side of the working-tree diff is HEAD, so a file deleted in the
+// working tree is still a valid target there.
 function atHead(top, rel) {
   try {
     execFileSync('git', ['-C', top, 'cat-file', '-e', `HEAD:${rel}`], {
