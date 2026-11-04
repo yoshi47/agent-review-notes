@@ -104,6 +104,11 @@
         "command": "reviewNotes.revealCard",
         "title": "Open Card",
         "category": "Review Notes"
+      },
+      {
+        "command": "reviewNotes.copyCliCommand",
+        "title": "Copy CLI Command",
+        "category": "Review Notes"
       }
     ],
     "menus": {

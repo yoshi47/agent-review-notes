@@ -173,6 +173,21 @@ test('next card marks the card being left as read and moves on', async () => {
   )
 })
 
+test('copy CLI command puts a runnable node command for the bundled CLI on the clipboard', async () => {
+  await vscode.commands.executeCommand('reviewNotes.copyCliCommand')
+  const copied = await vscode.env.clipboard.readText()
+  const cli = path.join(vscode.extensions.getExtension('yoshi47.review-notes').extensionPath, 'bin', 'review-notes.js')
+  assert.equal(copied, `node "${cli}"`)
+  // The extension host's own binary runs as Node with this flag, so the test
+  // does not depend on a node on PATH.
+  const r = require('node:child_process').spawnSync(process.execPath, [cli, '--workspace', ws, 'list'], {
+    encoding: 'utf8',
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+  })
+  assert.equal(r.status, 0, r.stderr)
+  assert.ok(Array.isArray(JSON.parse(r.stdout)))
+})
+
 async function run() {
   const self = vscode.extensions.getExtension('yoshi47.review-notes')
   await self.activate()

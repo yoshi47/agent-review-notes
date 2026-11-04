@@ -303,6 +303,11 @@ function activate(ctx) {
     vscode.commands.registerCommand('reviewNotes.markUnread', (t) =>
       onThread(t, 'unread'),
     ),
+    vscode.commands.registerCommand('reviewNotes.copyCliCommand', async () => {
+      const cli = `node "${ctx.asAbsolutePath(path.join('bin', 'review-notes.js'))}"`
+      await vscode.env.clipboard.writeText(cli)
+      vscode.window.showInformationMessage(`Copied: ${cli}`)
+    }),
   )
   setupCards(ctx)
   for (const folder of vscode.workspace.workspaceFolders ?? [])
