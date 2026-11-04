@@ -1,6 +1,6 @@
 # review-notes 設計
 
-review-companion 用の、自作の VS Code レビューコメント拡張と、AI が書き込む CLI。AI（review-companion）が解説カードと返信を置き、利用者が行に問いを書く。GitHub には何も書かない。
+review-companion 用の、自作の VS Code レビューコメント拡張と、AI が書き込む CLI。AI（review-companion）が解説カードと返信を置き、利用者が行に問いを書く。
 
 ## 求めること
 

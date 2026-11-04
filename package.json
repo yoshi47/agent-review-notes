@@ -1,7 +1,7 @@
 {
   "name": "review-notes",
   "displayName": "Review Notes",
-  "description": "Local review comment threads shared by an AI agent and you (nothing is written to GitHub)",
+  "description": "Read a pull request with your AI agent: ordered explanation cards and line-by-line Q&A threads on the diff",
   "version": "0.0.1",
   "publisher": "yoshi47",
   "private": true,
