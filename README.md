@@ -48,10 +48,11 @@ A thread opens when it is your turn to read: when the agent has posted or replie
 
 ## For agents: the CLI
 
-The CLI ships inside the extension at `bin/review-notes.js`. Run it with Node.js (tested with Node.js 24):
+The CLI ships inside the extension at `bin/review-notes.js` and runs with Node.js (tested with Node.js 24). Run Review Notes: Copy CLI Command from the Command Palette to copy `node "<extension folder>/bin/review-notes.js"`, and give it to your agent. The folder name contains the extension version, so copy it again after an update.
+
+The examples below write the CLI path as `$CLI`:
 
 ```sh
-CLI=$(ls -d ~/.vscode/extensions/yoshi47.review-notes-*/ | tail -n 1)bin/review-notes.js
 node "$CLI" --workspace <repo-or-worktree> <command>
 ```
 
