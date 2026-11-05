@@ -27,6 +27,8 @@ async function main(): Promise<void> {
   const ws = workspace()
   try {
     await runTests({
+      // Unset runs the latest stable; CI also runs the oldest version engines allows.
+      version: process.env.VSCODE_TEST_VERSION,
       extensionDevelopmentPath: path.resolve(__dirname, '..', '..'),
       extensionTestsPath: path.resolve(__dirname, 'suite.js'),
       // Built-in extensions (git) stay on; installed ones would only add noise.

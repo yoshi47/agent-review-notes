@@ -1,6 +1,6 @@
-<img src="media/icon.png" width="128" height="128" alt="Review Notes icon">
+<img src="media/icon.png" width="128" height="128" alt="Agent Review Notes icon">
 
-# Review Notes
+# Agent Review Notes
 
 Ask your AI coding agent about a change, right on the diff in VS Code.
 
@@ -30,7 +30,7 @@ Threads go on the Source Control diff, which compares the working tree with `HEA
 
 ## Install
 
-Install Review Notes from the VS Code Marketplace, or build a VSIX from this repository:
+Agent Review Notes needs VS Code 1.80 or later. Install it from the VS Code Marketplace or Open VSX, or build a VSIX from this repository:
 
 ```sh
 npx @vscode/vsce package --no-dependencies -o review-notes.vsix
@@ -40,7 +40,7 @@ code --install-extension review-notes.vsix
 ## Reading a review
 
 - Cards: Next Card, Previous Card and Next Unread Card are in the Command Palette. Moving past a card with Next Card marks it as read
-- Card list: the Review Notes view in the Source Control sidebar lists the cards in order. Uncheck a card to mark it unread again
+- Card list: the Agent Review Notes view in the Source Control sidebar lists the cards in order. Uncheck a card to mark it unread again
 - Badges: files with unread cards show the unread count in the Explorer and Source Control lists
 - Status bar: shows `Cards N unread / M`. Click it to go to the next unread card
 - Asking: click `+` next to a line number, write your question, and send it with Cmd+Enter (Ctrl+Enter)
@@ -50,7 +50,7 @@ A thread opens when it is your turn to read: when the agent has posted or replie
 
 ## For agents: the CLI
 
-The CLI ships inside the extension at `out/bin/review-notes.js` and runs with Node.js (tested with Node.js 24). Run Review Notes: Copy CLI Command from the Command Palette to copy `node "<extension folder>/out/bin/review-notes.js"`, and give it to your agent. The folder name contains the extension version, so copy it again after an update.
+The CLI ships inside the extension at `out/bin/review-notes.js` and runs with Node.js (tested with Node.js 24). Run Agent Review Notes: Copy CLI Command from the Command Palette to copy `node "<extension folder>/out/bin/review-notes.js"`, and give it to your agent. The folder name contains the extension version, so copy it again after an update.
 
 The examples below write the CLI path as `$CLI`:
 

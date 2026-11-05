@@ -19,6 +19,13 @@ jobs:
 
   vscode:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The latest stable, and the oldest version engines.vscode allows.
+        version: [stable, 1.80.0]
+    env:
+      VSCODE_TEST_VERSION: ${{ matrix.version }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

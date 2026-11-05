@@ -243,7 +243,7 @@ export function write(repo: Repo, events: NewEvent[]): LogEvent[] | undefined {
     return store.append(repo.log, events)
   } catch (e) {
     vscode.window.showErrorMessage(
-      `Review Notes: could not write (${e instanceof Error ? e.message : String(e)})`,
+      `Agent Review Notes: could not write (${e instanceof Error ? e.message : String(e)})`,
     )
     return undefined
   }
@@ -285,7 +285,7 @@ export function activate(ctx: vscode.ExtensionContext): void {
   context = ctx
   controller = vscode.comments.createCommentController(
     'review-notes',
-    'Review Notes',
+    'Agent Review Notes',
   )
   controller.options = { placeHolder: 'Ask a question (Cmd+Enter to send)' }
   controller.commentingRangeProvider = {
@@ -387,7 +387,7 @@ function go(
   const current = nav.currentCard(repo.threads, cursor, repo.last)
   const target = nav.step(repo.threads, current, dir, opts)
   if (!target) {
-    vscode.window.setStatusBarMessage('Review Notes: no more cards', 3000)
+    vscode.window.setStatusBarMessage('Agent Review Notes: no more cards', 3000)
     return
   }
   const left = nav.cards(repo.threads).find((t) => t.card === current)
