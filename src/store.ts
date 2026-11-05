@@ -3,14 +3,66 @@
 // rebuilt by folding the whole log. Lives in the git dir so the working tree
 // stays clean and `git worktree remove` takes the review with it.
 
-const { execFileSync } = require('node:child_process')
-const crypto = require('node:crypto')
-const fs = require('node:fs')
-const path = require('node:path')
+import { execFileSync } from 'node:child_process'
+import * as crypto from 'node:crypto'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 
 const LOG = 'review-notes.jsonl'
 
-function repoOf(dir, exec = execFileSync) {
+export type By = 'human' | 'agent'
+export type Side = 'old' | 'new'
+
+export interface AddFields {
+  path: string
+  line: number
+  body: string
+  card?: number
+  side?: 'old'
+}
+
+export type NewEvent = { by: By } & (
+  | ({ type: 'add' } & AddFields)
+  | { type: 'reply'; thread: string; body: string }
+  | {
+      type: 'resolve' | 'reopen' | 'read' | 'unread' | 'focus'
+      thread: string
+    }
+)
+
+export type LogEvent = NewEvent & { id: string; at: string }
+
+export interface Reply {
+  id: string
+  by: By
+  at: string
+  body: string
+}
+
+export interface Thread extends AddFields {
+  id: string
+  at: string
+  by: By
+  replies: Reply[]
+  resolved: boolean
+  read: boolean
+}
+
+export interface Mark {
+  count: number
+  lastId: string | undefined
+}
+
+type Exec = (
+  file: string,
+  args: string[],
+  options: { encoding: 'utf8'; stdio: ['ignore', 'pipe', 'ignore'] },
+) => string
+
+export function repoOf(
+  dir: string,
+  exec: Exec = execFileSync,
+): { top: string; log: string } {
   const [top, gitDir] = exec(
     'git',
     ['-C', dir, 'rev-parse', '--show-toplevel', '--absolute-git-dir'],
@@ -24,7 +76,7 @@ function repoOf(dir, exec = execFileSync) {
   return { top, log: path.join(gitDir, LOG) }
 }
 
-function append(file, events) {
+export function append(file: string, events: NewEvent[]): LogEvent[] {
   const now = new Date().toISOString()
   const full = events.map((e) => ({ id: crypto.randomUUID(), at: now, ...e }))
   let text = full.map((e) => JSON.stringify(e) + '\n').join('')
@@ -40,8 +92,10 @@ function append(file, events) {
   return full
 }
 
-function read(file) {
-  let text
+// Lines are only parsed, not validated: a hand-edited log can hold anything,
+// so readers of the folded threads still check the fields they rely on.
+export function read(file: string): LogEvent[] {
+  let text: string
   try {
     text = fs.readFileSync(file, 'utf8')
   } catch {
@@ -49,18 +103,18 @@ function read(file) {
   }
   // Whatever follows the last newline is still being written.
   const lines = text.slice(0, text.lastIndexOf('\n') + 1).split('\n')
-  const events = []
+  const events: LogEvent[] = []
   for (const line of lines) {
     if (!line) continue
     try {
-      events.push(JSON.parse(line))
+      events.push(JSON.parse(line) as LogEvent)
     } catch {}
   }
   return events
 }
 
-function fold(events) {
-  const threads = new Map()
+export function fold(events: LogEvent[]): Map<string, Thread> {
+  const threads = new Map<string, Thread>()
   for (const e of events) {
     if (e.type === 'add') {
       const { type, ...rest } = e
@@ -79,14 +133,18 @@ function fold(events) {
   return threads
 }
 
-const lastBy = (t) => (t.replies.at(-1) ?? t).by
+export const lastBy = (t: Thread): By => (t.replies.at(-1) ?? t).by
 
-const unanswered = (threads) =>
+export const unanswered = (threads: Map<string, Thread>): Thread[] =>
   [...threads.values()].filter((t) => !t.resolved && lastBy(t) === 'human')
 
-const initialExpand = (t) => !t.resolved && lastBy(t) === 'agent'
+export const initialExpand = (t: Thread): boolean =>
+  !t.resolved && lastBy(t) === 'agent'
 
-function fresh(events, mark) {
+export function fresh<E extends { id: string }>(
+  events: E[],
+  mark: Mark | undefined,
+): { news: E[]; mark: Mark } {
   const known =
     mark &&
     mark.count <= events.length &&
@@ -99,24 +157,11 @@ function fresh(events, mark) {
 
 // The base is the repository top as seen through the folder VS Code opened, so
 // a symlinked or sub-folder workspace still yields URIs its editors use.
-const baseOf = (folderFsPath, top) =>
+export const baseOf = (folderFsPath: string, top: string): string =>
   path.join(folderFsPath, path.relative(fs.realpathSync(folderFsPath), top))
 
-const relPath = (base, fsPath) =>
+export const relPath = (base: string, fsPath: string): string =>
   path.relative(base, fsPath).split(path.sep).join('/')
 
-const absPath = (base, rel) => path.join(base, ...rel.split('/'))
-
-module.exports = {
-  repoOf,
-  append,
-  read,
-  fold,
-  lastBy,
-  unanswered,
-  initialExpand,
-  fresh,
-  baseOf,
-  relPath,
-  absPath,
-}
+export const absPath = (base: string, rel: string): string =>
+  path.join(base, ...rel.split('/'))

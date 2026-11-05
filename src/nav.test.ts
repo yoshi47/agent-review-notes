@@ -1,16 +1,28 @@
-const assert = require('node:assert/strict')
-const { test } = require('node:test')
+import * as assert from 'node:assert/strict'
+import { test } from 'node:test'
 
-const nav = require('./nav')
+import * as nav from './nav'
 
-const card = (id, path, line, n, read = false) => [
-  id,
-  { id, path, line, card: n, read, replies: [] },
-]
-const threads = new Map([
+type T = {
+  id: string
+  path: string
+  line: number
+  card?: number
+  side?: 'old'
+  read: boolean
+}
+
+const card = (
+  id: string,
+  path: string,
+  line: number,
+  n: number,
+  read = false,
+): [string, T] => [id, { id, path, line, card: n, read }]
+const threads = new Map<string, T>([
   card('c3', 'a.ts', 50, 3),
   card('c1', 'a.ts', 10, 1),
-  ['plain', { id: 'plain', path: 'c.ts', line: 1, read: false, replies: [] }],
+  ['plain', { id: 'plain', path: 'c.ts', line: 1, read: false }],
   card('c2', 'b.ts', 5, 2, true),
 ])
 
@@ -28,16 +40,16 @@ test('currentCard prefers the card on the cursor line, then the last one reached
 })
 
 test('currentCard tells the old side of a line from the new side', () => {
-  const both = new Map([
-    ['n', { id: 'n', path: 'a.ts', line: 5, card: 1, replies: [] }],
-    ['o', { id: 'o', path: 'a.ts', line: 5, card: 2, side: 'old', replies: [] }],
+  const both = new Map<string, T>([
+    ['n', { id: 'n', path: 'a.ts', line: 5, card: 1, read: false }],
+    ['o', { id: 'o', path: 'a.ts', line: 5, card: 2, side: 'old', read: false }],
   ])
   assert.equal(nav.currentCard(both, { path: 'a.ts', line: 5, side: 'new' }), 1)
   assert.equal(nav.currentCard(both, { path: 'a.ts', line: 5, side: 'old' }), 2)
 })
 
 test('step moves forward and back through card numbers', () => {
-  const id = (t) => t?.id
+  const id = (t: T | undefined) => t?.id
   assert.equal(id(nav.step(threads, undefined, 1)), 'c1')
   assert.equal(id(nav.step(threads, undefined, -1)), 'c3')
   assert.equal(id(nav.step(threads, 1, 1)), 'c2')

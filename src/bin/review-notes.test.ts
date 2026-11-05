@@ -1,11 +1,11 @@
-const assert = require('node:assert/strict')
-const { execFileSync, spawnSync } = require('node:child_process')
-const fs = require('node:fs')
-const os = require('node:os')
-const path = require('node:path')
-const { test } = require('node:test')
+import * as assert from 'node:assert/strict'
+import { execFileSync, spawnSync } from 'node:child_process'
+import * as fs from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
+import { test } from 'node:test'
 
-const store = require('../store')
+import * as store from '../store'
 
 const CLI = path.join(__dirname, 'review-notes.js')
 
@@ -18,8 +18,16 @@ function repo() {
   return d
 }
 
-function run(dir, args, entries) {
-  const extra = []
+// The CLI's stdout is JSON whose shape depends on the command, so the tests
+// read it loosely.
+type Out = any
+
+function run(
+  dir: string | undefined,
+  args: string[],
+  entries?: unknown,
+): { status: number | null; out: Out; stderr: string } {
+  const extra: string[] = []
   if (entries !== undefined) {
     const f = path.join(
       fs.mkdtempSync(path.join(os.tmpdir(), 'rn-in-')),
@@ -38,14 +46,14 @@ function run(dir, args, entries) {
       encoding: 'utf8',
     },
   )
-  let out
+  let out: Out
   try {
     out = JSON.parse(r.stdout)
   } catch {}
   return { status: r.status, out, stderr: r.stderr }
 }
 
-const list = (d, ...flags) => run(d, ['list', ...flags]).out
+const list = (d: string, ...flags: string[]) => run(d, ['list', ...flags]).out
 
 test('post adds agent threads in one append', () => {
   const d = repo()
@@ -62,7 +70,7 @@ test('post adds agent threads in one append', () => {
   const threads = list(d)
   assert.equal(threads.length, 2)
   assert.deepEqual(
-    threads.map((t) => [t.path, t.line, t.card, t.by]),
+    threads.map((t: Out) => [t.path, t.line, t.card, t.by]),
     [
       ['a b.ts', 3, 1, 'agent'],
       ['@x/f.ts', 1, undefined, 'agent'],
@@ -163,7 +171,7 @@ test('usage errors exit 2', () => {
 
 function committed() {
   const d = repo()
-  const git = (...a) => execFileSync('git', ['-C', d, ...a])
+  const git = (...a: string[]) => execFileSync('git', ['-C', d, ...a])
   git('add', '-A')
   git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'base')
   return d
@@ -187,7 +195,7 @@ test('side old is kept, and needs the path at HEAD rather than on disk', () => {
   assert.ok(r.out[1].error)
   assert.ok(r.out[2].id)
   assert.deepEqual(
-    list(d).map((t) => [t.path, t.side]),
+    list(d).map((t: Out) => [t.path, t.side]),
     [
       ['a b.ts', 'old'],
       ['@x/f.ts', undefined],

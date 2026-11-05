@@ -39,7 +39,7 @@ VS Code のコメント拡張と、AI エージェントが書き込む CLI。�
 
 ## CLI（`review-notes`、AI が使う）
 
-拡張に同梱する Node スクリプト。`--workspace <dir>` で対象のリポジトリ（worktree）を指す。
+拡張に同梱する Node スクリプト（`src/bin/review-notes.ts` をコンパイルした `out/bin/review-notes.js`）。`--workspace <dir>` で対象のリポジトリ（worktree）を指す。
 
 - `post <entries.json>`: エントリの配列をまとめて1回で追記する。エントリは `{path, line, body, card?, side?}`（新しいスレッド）か `{reply_to, body}`（返信）。`side: 'old'` は差分の古い側（HEAD）で、`path` は HEAD にあればよい（作業ツリーで消えたファイルにも置ける）。`side` が `old` / `new` 以外、新しい側で `<toplevel>/<path>` が無い、古い側で `HEAD:<path>` が無い、`reply_to` のスレッドが無い、などのエントリは書かずに `{error}` にする。stdout は入力順の `[{id} | {error}]`、exit は 0 = 全件、1 = 一部失敗、2 = 使い方の誤り
 - `focus --thread <id>`
