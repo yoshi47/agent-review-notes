@@ -1,3 +1,5 @@
+<img src="media/icon.png" width="128" height="128" alt="Review Notes icon">
+
 # Review Notes
 
 Ask your AI coding agent about a change, right on the diff in VS Code.

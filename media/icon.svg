@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <rect width="256" height="256" rx="48" fill="#1f2335"/>
+  <!-- diff lines -->
+  <rect x="28" y="40" width="200" height="26" rx="6" fill="#3a3f58"/>
+  <rect x="28" y="76" width="200" height="26" rx="6" fill="#5c2b34"/>
+  <rect x="40" y="86" width="14" height="6" rx="2" fill="#ff6b7a"/>
+  <rect x="66" y="84" width="110" height="10" rx="5" fill="#ff6b7a" opacity=".55"/>
+  <rect x="28" y="112" width="200" height="26" rx="6" fill="#1f4d33"/>
+  <rect x="40" y="122" width="14" height="6" rx="2" fill="#5fd38d"/>
+  <rect x="44" y="118" width="6" height="14" rx="2" fill="#5fd38d"/>
+  <rect x="66" y="120" width="130" height="10" rx="5" fill="#5fd38d" opacity=".55"/>
+  <rect x="48" y="48" width="120" height="10" rx="5" fill="#8a90b0" opacity=".6"/>
+  <g transform="translate(0 -10)">
+  <!-- your question -->
+  <path d="M36 152h104a14 14 0 0 1 14 14v34a14 14 0 0 1-14 14H74l-20 18v-18H36a14 14 0 0 1-14-14v-34a14 14 0 0 1 14-14z" fill="#2e7d32"/>
+  <text x="88" y="198" font-family="-apple-system,Helvetica,Arial,sans-serif" font-size="44" font-weight="800" fill="#fff" text-anchor="middle">?</text>
+  <!-- AI's answer -->
+  <path d="M132 168h88a14 14 0 0 1 14 14v34a14 14 0 0 1-14 14h-14v18l-20-18h-54a14 14 0 0 1-14-14v-34a14 14 0 0 1 14-14z" fill="#7c4dff" stroke="#1f2335" stroke-width="6"/>
+  <circle cx="152" cy="199" r="7" fill="#fff"/>
+  <circle cx="176" cy="199" r="7" fill="#fff"/>
+  <circle cx="200" cy="199" r="7" fill="#fff"/>
+  </g>
+</svg>
