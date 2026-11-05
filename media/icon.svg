@@ -1,7 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
-  <rect width="256" height="256" rx="48" fill="#1f2335"/>
-  <path d="M48 48h104a20 20 0 0 1 20 20v52a20 20 0 0 1-20 20H96l-30 26v-26H48a20 20 0 0 1-20-20V68a20 20 0 0 1 20-20z" fill="#2e7d32"/>
-  <text x="100" y="118" font-family="-apple-system,Helvetica,Arial,sans-serif" font-size="64" font-weight="800" fill="#fff" text-anchor="middle">?</text>
-  <path d="M120 112h88a20 20 0 0 1 20 20v52a20 20 0 0 1-20 20h-18v26l-30-26h-40a20 20 0 0 1-20-20v-52a20 20 0 0 1 20-20z" fill="#7c4dff" stroke="#1f2335" stroke-width="8"/>
-  <circle cx="138" cy="158" r="9" fill="#fff"/><circle cx="164" cy="158" r="9" fill="#fff"/><circle cx="190" cy="158" r="9" fill="#fff"/>
+  <mask id="gap" maskUnits="userSpaceOnUse" x="0" y="0" width="256" height="256">
+    <rect width="256" height="256" fill="#fff"/>
+    <path d="M120 112h88a20 20 0 0 1 20 20v52a20 20 0 0 1-20 20h-18v26l-30-26h-40a20 20 0 0 1-20-20v-52a20 20 0 0 1 20-20z" fill="#000" stroke="#000" stroke-width="16" stroke-linejoin="round"/>
+  </mask>
+  <g transform="translate(128 128) scale(1.08) translate(-128 -139)">
+    <path d="M48 48h104a20 20 0 0 1 20 20v52a20 20 0 0 1-20 20H96l-30 26v-26H48a20 20 0 0 1-20-20V68a20 20 0 0 1 20-20z" fill="#43a047" mask="url(#gap)"/>
+    <text x="100" y="112" font-family="-apple-system,Helvetica,Arial,sans-serif" font-size="60" font-weight="800" fill="#fff" text-anchor="middle">?</text>
+    <path d="M120 112h88a20 20 0 0 1 20 20v52a20 20 0 0 1-20 20h-18v26l-30-26h-40a20 20 0 0 1-20-20v-52a20 20 0 0 1 20-20z" fill="#7c4dff"/>
+    <circle cx="138" cy="158" r="9" fill="#fff"/><circle cx="164" cy="158" r="9" fill="#fff"/><circle cx="190" cy="158" r="9" fill="#fff"/>
+  </g>
 </svg>
