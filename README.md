@@ -2,6 +2,9 @@
 
 # Agent Review Notes
 
+[![VS Code Marketplace](https://img.shields.io/badge/VS%20Code%20Marketplace-Agent%20Review%20Notes-007ACC)](https://marketplace.visualstudio.com/items?itemName=yoshi47.agent-review-notes)
+[![Open VSX](https://img.shields.io/open-vsx/v/yoshi47/agent-review-notes?label=Open%20VSX)](https://open-vsx.org/extension/yoshi47/agent-review-notes)
+
 Ask your AI coding agent about a change, right on the diff in VS Code.
 
 You leave a question on a line. The agent answers in the same thread, and VS Code tells you when it does. The agent can also start threads itself, such as numbered cards that walk you through a pull request.
@@ -30,7 +33,13 @@ Threads go on the Source Control diff, which compares the working tree with `HEA
 
 ## Install
 
-Agent Review Notes needs VS Code 1.80 or later. Install it from the VS Code Marketplace or Open VSX, or build a VSIX from this repository:
+Agent Review Notes needs VS Code 1.80 or later. Install it from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=yoshi47.agent-review-notes) or [Open VSX](https://open-vsx.org/extension/yoshi47/agent-review-notes) (for VSCodium, Cursor and other editors that use it), or from the command line:
+
+```sh
+code --install-extension yoshi47.agent-review-notes
+```
+
+To build a VSIX from this repository instead:
 
 ```sh
 npx @vscode/vsce package --no-dependencies -o review-notes.vsix
