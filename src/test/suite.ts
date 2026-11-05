@@ -4,62 +4,64 @@
 // and whether the commands and the log watcher reach the real comment threads.
 // The tests share one log and run in order.
 
-const assert = require('node:assert/strict')
-const path = require('node:path')
-const vscode = require('vscode')
+import * as assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
+import * as path from 'node:path'
+import * as vscode from 'vscode'
 
-const store = require('../store')
+import type * as Ext from '../extension'
+import * as store from '../store'
 
-const ws = process.env.REVIEW_NOTES_WS
-const file = (rel) => vscode.Uri.file(path.join(ws, rel))
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+const ws = process.env.REVIEW_NOTES_WS!
+const file = (rel: string) => vscode.Uri.file(path.join(ws, rel))
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-async function until(what, get, ms = 15000) {
+async function until<T>(what: string, get: () => T, ms = 15000): Promise<NonNullable<T>> {
   const end = Date.now() + ms
   for (;;) {
     const v = get()
-    if (v) return v
+    if (v) return v as NonNullable<T>
     if (Date.now() > end) throw new Error(`timed out waiting for ${what}`)
     await sleep(100)
   }
 }
 
-const gitEditor = (rel) =>
+const gitEditor = (rel: string) =>
   vscode.window.visibleTextEditors.find(
     (e) =>
       e.document.uri.scheme === 'git' &&
       e.document.uri.fsPath === file(rel).fsPath,
   )
 
-async function openChange(rel) {
+async function openChange(rel: string): Promise<vscode.TextEditor> {
   await vscode.commands.executeCommand('workbench.action.closeAllEditors')
   await vscode.commands.executeCommand('git.openChange', file(rel))
   return until(`the old side of ${rel}`, () => gitEditor(rel))
 }
 
-const tests = []
-const test = (name, fn) => tests.push({ name, fn })
+const tests: { name: string; fn: () => unknown }[] = []
+const test = (name: string, fn: () => unknown) => tests.push({ name, fn })
 
-let ext
-let repo
+let ext: typeof Ext
+let repo: Ext.Repo
 
 test('the old side of a modified file matches the left side of its diff', async () => {
   const left = await openChange('a.ts')
-  const built = ext.uriOf(repo, { path: 'a.ts', line: 1, side: 'old' })
+  const built = ext.uriOf(repo, { path: 'a.ts', side: 'old' })
   assert.equal(built.toString(), left.document.uri.toString())
-  const at = ext.locate(left.document.uri)
+  const at = ext.locate(left.document.uri)!
   assert.deepEqual([at.repo, at.path, at.side], [repo, 'a.ts', 'old'])
 })
 
 test('the old side of a deleted file matches what the git extension opens', async () => {
   const shown = await openChange('gone.ts')
-  const built = ext.uriOf(repo, { path: 'gone.ts', line: 1, side: 'old' })
+  const built = ext.uriOf(repo, { path: 'gone.ts', side: 'old' })
   assert.equal(built.toString(), shown.document.uri.toString())
-  assert.equal(ext.locate(shown.document.uri).side, 'old')
+  assert.equal(ext.locate(shown.document.uri)?.side, 'old')
 })
 
 test('the working file is the new side, other git refs are no side', () => {
-  const at = ext.locate(file('a.ts'))
+  const at = ext.locate(file('a.ts'))!
   assert.deepEqual([at.path, at.side], ['a.ts', 'new'])
   const history = file('a.ts').with({
     scheme: 'git',
@@ -79,7 +81,8 @@ test('a comment written on the left side is stored as the old side', async () =>
     thread,
     text: 'why was this removed?',
   })
-  const e = store.read(repo.log).at(-1)
+  const e = store.read(repo.log).at(-1)!
+  assert.ok(e.type === 'add')
   assert.deepEqual(
     [e.type, e.by, e.path, e.line, e.side],
     ['add', 'human', 'a.ts', 7, 'old'],
@@ -97,15 +100,21 @@ test('reveal puts the cursor on the old-side line in the diff', async () => {
   assert.equal(left.selection.active.line, 3)
 })
 
-const last = () => store.read(repo.log).at(-1)
+// The log's last event, read loosely: each test checks the fields it wrote.
+const last = () => store.read(repo.log).at(-1) as Record<string, unknown>
 
 test('the thread title buttons log resolve, reopen, read and unread', async () => {
   const [e] = store.append(repo.log, [
     { type: 'add', by: 'agent', path: 'a.ts', line: 2, body: 'y', card: 2 },
   ])
   ext.render(repo)
-  const n = repo.native.get(e.id)
-  const press = async (command, type, contextValue, state) => {
+  const n = repo.native.get(e.id)!
+  const press = async (
+    command: string,
+    type: string,
+    contextValue: string,
+    state: vscode.CommentThreadState,
+  ) => {
     await vscode.commands.executeCommand(command, n)
     assert.deepEqual(
       [last().type, last().by, last().thread],
@@ -126,7 +135,7 @@ test('a reply is logged as human, and a blank one is not logged', async () => {
     { type: 'add', by: 'agent', path: 'a.ts', line: 3, body: 'z' },
   ])
   ext.render(repo)
-  const n = repo.native.get(e.id)
+  const n = repo.native.get(e.id)!
   const before = store.read(repo.log).length
   await vscode.commands.executeCommand('reviewNotes.reply', { thread: n, text: '  ' })
   assert.equal(store.read(repo.log).length, before)
@@ -144,7 +153,7 @@ test('an AI reply appended to the log shows up through the file watcher', async 
     { type: 'add', by: 'human', path: 'a.ts', line: 5, body: 'q' },
   ])
   ext.render(repo)
-  const n = repo.native.get(e.id)
+  const n = repo.native.get(e.id)!
   assert.equal(n.label, 'Waiting for AI')
   // No render() here: only the watcher on the log may pick this up.
   store.append(repo.log, [{ type: 'reply', by: 'agent', thread: e.id, body: 'a' }])
@@ -159,16 +168,16 @@ test('next card marks the card being left as read and moves on', async () => {
   const [one, two] = [1, 2].map((c) =>
     [...repo.threads.values()].find((t) => t.card === c),
   )
-  assert.equal(one.read, false)
+  assert.equal(one?.read, false)
   repo.last = 1
   await vscode.commands.executeCommand('reviewNotes.nextCard')
   assert.equal(repo.last, 2)
-  assert.equal(repo.threads.get(one.id).read, true)
+  assert.equal(repo.threads.get(one!.id)?.read, true)
   await until('card 2 to be revealed', () =>
     vscode.window.visibleTextEditors.find(
       (e) =>
         e.document.uri.toString() === file('a.ts').toString() &&
-        e.selection.active.line === two.line - 1,
+        e.selection.active.line === two!.line - 1,
     ),
   )
 })
@@ -176,11 +185,11 @@ test('next card marks the card being left as read and moves on', async () => {
 test('copy CLI command puts a runnable node command for the bundled CLI on the clipboard', async () => {
   await vscode.commands.executeCommand('reviewNotes.copyCliCommand')
   const copied = await vscode.env.clipboard.readText()
-  const cli = path.join(vscode.extensions.getExtension('yoshi47.review-notes').extensionPath, 'bin', 'review-notes.js')
+  const cli = path.join(vscode.extensions.getExtension('yoshi47.review-notes')!.extensionPath, 'out', 'bin', 'review-notes.js')
   assert.equal(copied, `node "${cli}"`)
   // The extension host's own binary runs as Node with this flag, so the test
   // does not depend on a node on PATH.
-  const r = require('node:child_process').spawnSync(process.execPath, [cli, '--workspace', ws, 'list'], {
+  const r = spawnSync(process.execPath, [cli, '--workspace', ws, 'list'], {
     encoding: 'utf8',
     env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
   })
@@ -188,29 +197,30 @@ test('copy CLI command puts a runnable node command for the bundled CLI on the c
   assert.ok(Array.isArray(JSON.parse(r.stdout)))
 })
 
-async function run() {
-  const self = vscode.extensions.getExtension('yoshi47.review-notes')
+export async function run(): Promise<void> {
+  const self = vscode.extensions.getExtension('yoshi47.review-notes')!
   await self.activate()
   ext = require('../extension')
-  const git = vscode.extensions.getExtension('vscode.git')
-  const api = (await git.activate()).getAPI(1)
+  const git = vscode.extensions.getExtension('vscode.git')!
+  // The git extension's API has no published types here, only what this needs.
+  const api: { repositories: { state: { workingTreeChanges: unknown[] } }[] } =
+    (await git.activate()).getAPI(1)
   await until('git to see both changes', () =>
     api.repositories[0]?.state.workingTreeChanges.length === 2,
   )
   repo = await until('review-notes to watch the repo', () =>
     [...ext.repos.values()][0],
   )
-  const failed = []
+  const failed: string[] = []
   for (const t of tests) {
     try {
       await t.fn()
       console.log(`ok   ${t.name}`)
     } catch (e) {
-      console.log(`FAIL ${t.name}\n${e.stack}`)
+      console.log(`FAIL ${t.name}\n${e instanceof Error ? e.stack : e}`)
       failed.push(t.name)
     }
   }
   if (failed.length) throw new Error(`${failed.length} of ${tests.length} failed`)
 }
 
-module.exports = { run }

@@ -50,7 +50,7 @@ A thread opens when it is your turn to read: when the agent has posted or replie
 
 ## For agents: the CLI
 
-The CLI ships inside the extension at `bin/review-notes.js` and runs with Node.js (tested with Node.js 24). Run Review Notes: Copy CLI Command from the Command Palette to copy `node "<extension folder>/bin/review-notes.js"`, and give it to your agent. The folder name contains the extension version, so copy it again after an update.
+The CLI ships inside the extension at `out/bin/review-notes.js` and runs with Node.js (tested with Node.js 24). Run Review Notes: Copy CLI Command from the Command Palette to copy `node "<extension folder>/out/bin/review-notes.js"`, and give it to your agent. The folder name contains the extension version, so copy it again after an update.
 
 The examples below write the CLI path as `$CLI`:
 
@@ -141,6 +141,7 @@ The state is rebuilt by reading the log from the top. Writers only append. A tra
 
 ```sh
 npm install
+npm run compile       # src/ (TypeScript) -> out/
 npm test              # store, navigation and CLI
 npm run test:vscode   # the extension inside a real VS Code, together with the git extension
 ```

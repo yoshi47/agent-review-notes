@@ -1,18 +1,18 @@
-// Runs test/suite.js inside a real VS Code (downloaded into .vscode-test/) on a
+// Runs suite.ts (compiled to out/test/suite.js) inside a real VS Code (downloaded into .vscode-test/) on a
 // throwaway repository whose change against HEAD is left unstaged, so it shows
 // in the working-tree diff.
 
-const { execFileSync } = require('node:child_process')
-const fs = require('node:fs')
-const os = require('node:os')
-const path = require('node:path')
-const { runTests } = require('@vscode/test-electron')
+import { runTests } from '@vscode/test-electron'
+import { execFileSync } from 'node:child_process'
+import * as fs from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
 
-function workspace() {
+function workspace(): string {
   const d = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'rn-vsc-')))
-  const git = (...a) => execFileSync('git', ['-C', d, ...a])
+  const git = (...a: string[]) => execFileSync('git', ['-C', d, ...a])
   git('init', '-q')
-  const lines = (n, tag) =>
+  const lines = (n: number, tag: string) =>
     Array.from({ length: n }, (_, i) => `${tag} ${i + 1}`).join('\n') + '\n'
   fs.writeFileSync(path.join(d, 'a.ts'), lines(10, 'old'))
   fs.writeFileSync(path.join(d, 'gone.ts'), lines(5, 'gone'))
@@ -23,11 +23,11 @@ function workspace() {
   return d
 }
 
-async function main() {
+async function main(): Promise<void> {
   const ws = workspace()
   try {
     await runTests({
-      extensionDevelopmentPath: path.resolve(__dirname, '..'),
+      extensionDevelopmentPath: path.resolve(__dirname, '..', '..'),
       extensionTestsPath: path.resolve(__dirname, 'suite.js'),
       // Built-in extensions (git) stay on; installed ones would only add noise.
       launchArgs: [ws, '--disable-extensions', '--disable-workspace-trust'],

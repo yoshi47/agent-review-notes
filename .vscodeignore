@@ -1,8 +1,10 @@
-**/*.test.js
+src
+out/test
+out/**/*.test.js
+tsconfig.json
 *.vsix
 node_modules
 .vscode-test
-test
 package-lock.json
 media/icon.svg
 docs

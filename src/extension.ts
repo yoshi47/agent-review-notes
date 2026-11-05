@@ -1,22 +1,46 @@
-const fs = require('node:fs')
-const path = require('node:path')
-const vscode = require('vscode')
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+import * as vscode from 'vscode'
 
-const nav = require('./nav')
-const store = require('./store')
+import * as nav from './nav'
+import * as store from './store'
+import type { LogEvent, NewEvent, Side, Thread } from './store'
+
+export interface Repo {
+  top: string
+  log: string
+  base: string
+  threads: Map<string, Thread>
+  native: Map<string, vscode.CommentThread>
+  sig: Map<string, string>
+  last?: number
+}
+
+interface Location {
+  repo: Repo
+  path: string
+  side: Side
+}
+
+interface CardItem {
+  repo: Repo
+  t: Thread
+}
 
 const { Expanded, Collapsed } = vscode.CommentThreadCollapsibleState
-const repos = new Map() // log path -> repo
-const rendered = new vscode.EventEmitter()
-let context
-let controller
-let pending = []
-let timer
+export const repos = new Map<string, Repo>() // log path -> repo
+export const rendered = new vscode.EventEmitter<Repo>()
+let context: vscode.ExtensionContext
+let controller: vscode.CommentController
+let pending: { repo: Repo; e: LogEvent }[] = []
+let timer: NodeJS.Timeout | undefined
 
-const lineRange = (line) => new vscode.Range(line - 1, 0, line - 1, 0)
-const fileUri = (repo, rel) => vscode.Uri.file(store.absPath(repo.base, rel))
+const lineRange = (line: number) => new vscode.Range(line - 1, 0, line - 1, 0)
+const fileUri = (repo: Repo, rel: string) =>
+  vscode.Uri.file(store.absPath(repo.base, rel))
 const config = () => vscode.workspace.getConfiguration('reviewNotes')
-const where = (t) => `${t.path}:${t.line}${t.side === 'old' ? ' (old)' : ''}`
+const where = (t: Thread) =>
+  `${t.path}:${t.line}${t.side === 'old' ? ' (old)' : ''}`
 
 // The old side is whatever the git extension opens for the working-tree diff:
 // ref '~' (index) on the left for a modified file, 'HEAD' alone for a deleted
@@ -25,7 +49,10 @@ const OLD_REFS = new Set(['~', 'HEAD'])
 
 // Threads only show on a document whose URI matches exactly, so this has to
 // rebuild the git extension's own toGitUri() for the ref it would pick.
-function uriOf(repo, t) {
+export function uriOf(
+  repo: Repo,
+  t: Pick<Thread, 'path' | 'side'>,
+): vscode.Uri {
   const file = fileUri(repo, t.path)
   if (t.side !== 'old') return file
   const ref = fs.existsSync(file.fsPath) ? '~' : 'HEAD'
@@ -35,20 +62,21 @@ function uriOf(repo, t) {
   })
 }
 
-const sameUri = (a, b) =>
+const sameUri = (a: vscode.Uri, b: vscode.Uri) =>
   a.scheme === b.scheme && a.fsPath === b.fsPath && a.query === b.query
 
-function locate(uri) {
+export function locate(uri: vscode.Uri): Location | undefined {
   let fsPath = uri.fsPath
-  let side = 'new'
+  let side: Side = 'new'
   if (uri.scheme === 'git') {
-    let q
+    let q: { path?: unknown; ref?: unknown } | null
     try {
       q = JSON.parse(uri.query)
     } catch {
       return undefined
     }
-    if (!OLD_REFS.has(q?.ref) || typeof q.path !== 'string') return undefined
+    if (typeof q?.ref !== 'string' || !OLD_REFS.has(q.ref)) return undefined
+    if (typeof q.path !== 'string') return undefined
     fsPath = q.path
     side = 'old'
   } else if (uri.scheme !== 'file') return undefined
@@ -58,12 +86,12 @@ function locate(uri) {
   return repo && { repo, path: store.relPath(repo.base, fsPath), side }
 }
 
-function idOf(repo, native) {
+function idOf(repo: Repo, native: vscode.CommentThread): string | undefined {
   for (const [id, n] of repo.native) if (n === native) return id
   return undefined
 }
 
-function toComments(t) {
+function toComments(t: Thread): vscode.Comment[] {
   return [t, ...t.replies].map((c) => ({
     body: new vscode.MarkdownString(c.body ?? ''),
     mode: vscode.CommentMode.Preview,
@@ -75,27 +103,28 @@ function toComments(t) {
   }))
 }
 
-function label(t) {
+function label(t: Thread): string | undefined {
   if (t.card !== undefined) return `Card ${t.card}`
   if (!t.resolved && store.lastBy(t) === 'human') return 'Waiting for AI'
   return undefined
 }
 
-const agentReplies = (t) => t.replies.filter((r) => r.by === 'agent').length
+const agentReplies = (t: Thread) =>
+  t.replies.filter((r) => r.by === 'agent').length
 
 // The extension host only forwards a collapsibleState that differs from its own
 // copy, so a thread the user collapsed in the UI needs Collapsed first.
-function expand(native) {
+function expand(native: vscode.CommentThread): void {
   native.collapsibleState = Collapsed
   native.collapsibleState = Expanded
 }
 
-function collapse(native) {
+function collapse(native: vscode.CommentThread): void {
   native.collapsibleState = Expanded
   native.collapsibleState = Collapsed
 }
 
-function render(repo) {
+export function render(repo: Repo): void {
   const events = store.read(repo.log)
   const threads = store.fold(events)
   // One malformed thread (hand-edited log) must not stop the rest from showing.
@@ -140,24 +169,27 @@ function render(repo) {
   repo.threads = threads
 
   const key = `mark:${repo.log}`
-  const { news, mark } = store.fresh(events, context.workspaceState.get(key))
+  const { news, mark } = store.fresh(
+    events,
+    context.workspaceState.get<store.Mark>(key),
+  )
   context.workspaceState.update(key, mark)
   const writes = news.filter(
     (e) => e.by === 'agent' && (e.type === 'add' || e.type === 'reply'),
   )
   if (writes.length) queueNotice(repo, writes)
   const focus = news.filter((e) => e.type === 'focus').at(-1)
-  if (focus) reveal(repo, focus.thread)
+  if (focus?.type === 'focus') reveal(repo, focus.thread)
   rendered.fire(repo)
 }
 
-function queueNotice(repo, writes) {
+function queueNotice(repo: Repo, writes: LogEvent[]): void {
   pending.push(...writes.map((e) => ({ repo, e })))
   clearTimeout(timer)
   timer = setTimeout(notify, config().get('notifyDelaySeconds', 2) * 1000)
 }
 
-async function notify() {
+async function notify(): Promise<void> {
   const items = pending
   pending = []
   if (!items.length) return
@@ -172,7 +204,7 @@ async function notify() {
     reveal(repo, threadId)
 }
 
-async function reveal(repo, id) {
+export async function reveal(repo: Repo, id: string): Promise<void> {
   const t = repo.threads.get(id)
   const n = repo.native.get(id)
   if (!t || !n) return
@@ -206,33 +238,38 @@ async function reveal(repo, id) {
   expand(n)
 }
 
-function write(repo, events) {
+export function write(repo: Repo, events: NewEvent[]): LogEvent[] | undefined {
   try {
     return store.append(repo.log, events)
   } catch (e) {
     vscode.window.showErrorMessage(
-      `Review Notes: could not write (${e.message})`,
+      `Review Notes: could not write (${e instanceof Error ? e.message : String(e)})`,
     )
     return undefined
   }
 }
 
-function onThread(native, type) {
+type ThreadAction = 'resolve' | 'reopen' | 'read' | 'unread'
+
+function onThread(
+  native: vscode.CommentThread | undefined,
+  type: ThreadAction,
+): void {
   const repo = native && locate(native.uri)?.repo
   const id = repo && idOf(repo, native)
-  if (!id) return
+  if (!repo || !id) return
   if (write(repo, [{ type, by: 'human', thread: id }])) render(repo)
 }
 
-function addFolder(folder) {
-  let found
+function addFolder(folder: vscode.WorkspaceFolder): void {
+  let found: { top: string; log: string }
   try {
     found = store.repoOf(folder.uri.fsPath)
   } catch {
     return
   }
   if (repos.has(found.log)) return
-  const repo = {
+  const repo: Repo = {
     ...found,
     base: store.baseOf(folder.uri.fsPath, found.top),
     threads: new Map(),
@@ -244,7 +281,7 @@ function addFolder(folder) {
   fs.watchFile(repo.log, { interval: 750 }, () => render(repo))
 }
 
-function activate(ctx) {
+export function activate(ctx: vscode.ExtensionContext): void {
   context = ctx
   controller = vscode.comments.createCommentController(
     'review-notes',
@@ -260,51 +297,61 @@ function activate(ctx) {
   ctx.subscriptions.push(
     controller,
     rendered,
-    vscode.commands.registerCommand('reviewNotes.create', (reply) => {
-      const at = locate(reply.thread.uri)
-      if (!at || !reply.text.trim()) return
-      const { repo } = at
-      const add = {
-        type: 'add',
-        by: 'human',
-        path: at.path,
-        line: reply.thread.range.start.line + 1,
-        body: reply.text,
-      }
-      if (at.side === 'old') add.side = 'old'
-      const [e] = write(repo, [add]) ?? []
-      if (!e) return
-      // Keep VS Code's own thread: recreating it would apply the "AI's turn
-      // is over" rule and collapse the question the user just wrote.
-      repo.native.set(e.id, reply.thread)
-      reply.thread.collapsibleState = Expanded
-      render(repo)
-    }),
-    vscode.commands.registerCommand('reviewNotes.reply', (reply) => {
-      const repo = locate(reply.thread.uri)?.repo
-      const id = repo && idOf(repo, reply.thread)
-      if (!id || !reply.text.trim()) return
-      if (
-        write(repo, [
-          { type: 'reply', by: 'human', thread: id, body: reply.text },
-        ])
-      )
+    vscode.commands.registerCommand(
+      'reviewNotes.create',
+      (reply: vscode.CommentReply) => {
+        const at = locate(reply.thread.uri)
+        if (!at || !reply.text.trim() || !reply.thread.range) return
+        const { repo } = at
+        const add: NewEvent = {
+          type: 'add',
+          by: 'human',
+          path: at.path,
+          line: reply.thread.range.start.line + 1,
+          body: reply.text,
+        }
+        if (at.side === 'old') add.side = 'old'
+        const [e] = write(repo, [add]) ?? []
+        if (!e) return
+        // Keep VS Code's own thread: recreating it would apply the "AI's turn
+        // is over" rule and collapse the question the user just wrote.
+        repo.native.set(e.id, reply.thread)
+        reply.thread.collapsibleState = Expanded
         render(repo)
-    }),
-    vscode.commands.registerCommand('reviewNotes.resolve', (t) =>
-      onThread(t, 'resolve'),
+      },
     ),
-    vscode.commands.registerCommand('reviewNotes.reopen', (t) =>
-      onThread(t, 'reopen'),
+    vscode.commands.registerCommand(
+      'reviewNotes.reply',
+      (reply: vscode.CommentReply) => {
+        const repo = locate(reply.thread.uri)?.repo
+        const id = repo && idOf(repo, reply.thread)
+        if (!repo || !id || !reply.text.trim()) return
+        if (
+          write(repo, [
+            { type: 'reply', by: 'human', thread: id, body: reply.text },
+          ])
+        )
+          render(repo)
+      },
     ),
-    vscode.commands.registerCommand('reviewNotes.markRead', (t) =>
-      onThread(t, 'read'),
+    vscode.commands.registerCommand(
+      'reviewNotes.resolve',
+      (t: vscode.CommentThread) => onThread(t, 'resolve'),
     ),
-    vscode.commands.registerCommand('reviewNotes.markUnread', (t) =>
-      onThread(t, 'unread'),
+    vscode.commands.registerCommand(
+      'reviewNotes.reopen',
+      (t: vscode.CommentThread) => onThread(t, 'reopen'),
+    ),
+    vscode.commands.registerCommand(
+      'reviewNotes.markRead',
+      (t: vscode.CommentThread) => onThread(t, 'read'),
+    ),
+    vscode.commands.registerCommand(
+      'reviewNotes.markUnread',
+      (t: vscode.CommentThread) => onThread(t, 'unread'),
     ),
     vscode.commands.registerCommand('reviewNotes.copyCliCommand', async () => {
-      const cli = `node "${ctx.asAbsolutePath(path.join('bin', 'review-notes.js'))}"`
+      const cli = `node "${ctx.asAbsolutePath(path.join('out', 'bin', 'review-notes.js'))}"`
       await vscode.env.clipboard.writeText(cli)
       vscode.window.showInformationMessage(`Copied: ${cli}`)
     }),
@@ -314,10 +361,10 @@ function activate(ctx) {
     addFolder(folder)
 }
 
-function activeRepo() {
+function activeRepo(): { repo: Repo; cursor: nav.Cursor | undefined } | undefined {
   const editor = vscode.window.activeTextEditor
   const at = editor && locate(editor.document.uri)
-  if (at) {
+  if (editor && at) {
     const cursor = {
       path: at.path,
       line: editor.selection.active.line + 1,
@@ -329,17 +376,20 @@ function activeRepo() {
   return withCards && { repo: withCards, cursor: undefined }
 }
 
-function go(dir, opts, markLeft) {
+function go(
+  dir: 1 | -1,
+  opts: { unreadOnly?: boolean; wrap?: boolean },
+  markLeft: boolean,
+): void {
   const here = activeRepo()
   if (!here) return
   const { repo, cursor } = here
   const current = nav.currentCard(repo.threads, cursor, repo.last)
   const target = nav.step(repo.threads, current, dir, opts)
-  if (!target)
-    return vscode.window.setStatusBarMessage(
-      'Review Notes: no more cards',
-      3000,
-    )
+  if (!target) {
+    vscode.window.setStatusBarMessage('Review Notes: no more cards', 3000)
+    return
+  }
   const left = nav.cards(repo.threads).find((t) => t.card === current)
   if (markLeft && left && !left.read)
     write(repo, [{ type: 'read', by: 'human', thread: left.id }])
@@ -348,10 +398,10 @@ function go(dir, opts, markLeft) {
   if (markLeft && left && !left.read) render(repo)
 }
 
-function setupCards(ctx) {
+function setupCards(ctx: vscode.ExtensionContext): void {
   let hidingRead = false
-  const changed = new vscode.EventEmitter()
-  const tree = vscode.window.createTreeView('reviewNotes.cards', {
+  const changed = new vscode.EventEmitter<void>()
+  const tree = vscode.window.createTreeView<CardItem>('reviewNotes.cards', {
     manageCheckboxStateManually: true,
     treeDataProvider: {
       onDidChangeTreeData: changed.event,
@@ -382,7 +432,7 @@ function setupCards(ctx) {
       },
     },
   })
-  const decorationsChanged = new vscode.EventEmitter()
+  const decorationsChanged = new vscode.EventEmitter<undefined>()
   const status = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Left,
     10,
@@ -402,7 +452,7 @@ function setupCards(ctx) {
     if (total) status.show()
     else status.hide()
   }
-  const setHiding = (v) => {
+  const setHiding = (v: boolean) => {
     hidingRead = v
     vscode.commands.executeCommand('setContext', 'reviewNotes.hidingRead', v)
     changed.fire()
@@ -414,7 +464,7 @@ function setupCards(ctx) {
     decorationsChanged,
     rendered.event(refresh),
     tree.onDidChangeCheckboxState((e) => {
-      const touched = new Set()
+      const touched = new Set<Repo>()
       for (const [{ repo, t }, state] of e.items) {
         const type =
           state === vscode.TreeItemCheckboxState.Checked ? 'read' : 'unread'
@@ -426,7 +476,7 @@ function setupCards(ctx) {
     vscode.window.registerFileDecorationProvider({
       onDidChangeFileDecorations: decorationsChanged.event,
       provideFileDecoration(uri) {
-        const at = uri.scheme === 'file' && locate(uri)
+        const at = uri.scheme === 'file' ? locate(uri) : undefined
         const n = at && nav.unreadByPath(at.repo.threads).get(at.path)
         // Badges longer than two characters are rejected by VS Code.
         return n
@@ -437,13 +487,16 @@ function setupCards(ctx) {
           : undefined
       },
     }),
-    vscode.commands.registerCommand('reviewNotes.revealCard', (log, id) => {
-      const repo = repos.get(log)
-      const t = repo?.threads.get(id)
-      if (!t) return
-      repo.last = t.card
-      reveal(repo, id)
-    }),
+    vscode.commands.registerCommand(
+      'reviewNotes.revealCard',
+      (log: string, id: string) => {
+        const repo = repos.get(log)
+        const t = repo?.threads.get(id)
+        if (!repo || !t) return
+        repo.last = t.card
+        reveal(repo, id)
+      },
+    ),
     vscode.commands.registerCommand('reviewNotes.nextCard', () =>
       go(1, {}, true),
     ),
@@ -463,19 +516,7 @@ function setupCards(ctx) {
   refresh()
 }
 
-function deactivate() {
+export function deactivate(): void {
   clearTimeout(timer)
   for (const log of repos.keys()) fs.unwatchFile(log)
-}
-
-module.exports = {
-  activate,
-  deactivate,
-  repos,
-  rendered,
-  locate,
-  uriOf,
-  reveal,
-  render,
-  write,
 }

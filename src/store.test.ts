@@ -1,14 +1,15 @@
-const assert = require('node:assert/strict')
-const { execFileSync, spawn } = require('node:child_process')
-const fs = require('node:fs')
-const os = require('node:os')
-const path = require('node:path')
-const { test } = require('node:test')
+import * as assert from 'node:assert/strict'
+import { execFileSync, spawn } from 'node:child_process'
+import * as fs from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
+import { test } from 'node:test'
 
-const store = require('./store')
+import * as store from './store'
+import type { LogEvent } from './store'
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'rn-'))
-const logIn = (dir) => path.join(dir, 'review-notes.jsonl')
+const logIn = (dir: string) => path.join(dir, 'review-notes.jsonl')
 
 test('append fills id and at, and read returns the same events', () => {
   const f = logIn(tmp())
@@ -47,15 +48,18 @@ test('read of a missing file is empty, and bad lines are skipped', () => {
   assert.deepEqual(store.read(logIn(d)), [{ type: 'add', id: '1' }])
 })
 
-const ev = (type, extra) => ({
-  type,
-  at: '2026-10-30T00:00:00Z',
-  by: 'human',
-  ...extra,
-})
+// Fold only reads the fields each event type needs, so the tests spell out
+// just those.
+const ev = (type: LogEvent['type'], extra: Record<string, unknown>) =>
+  ({
+    type,
+    at: '2026-10-30T00:00:00Z',
+    by: 'human',
+    ...extra,
+  }) as LogEvent
 
 test('fold builds threads from add, reply, resolve, reopen, read, unread', () => {
-  const t = (...events) => store.fold(events).get('t')
+  const t = (...events: LogEvent[]) => store.fold(events).get('t')!
   const add = ev('add', {
     id: 't',
     by: 'agent',
@@ -98,7 +102,7 @@ test('fold ignores events whose thread does not exist', () => {
 })
 
 test('unanswered and initialExpand follow whose turn it is', () => {
-  const cases = [
+  const cases: [LogEvent[], number, boolean][] = [
     [
       [ev('add', { id: 't', by: 'agent', path: 'a', line: 1, body: '' })],
       0,
@@ -125,7 +129,7 @@ test('unanswered and initialExpand follow whose turn it is', () => {
   for (const [events, n, open] of cases) {
     const threads = store.fold(events)
     assert.equal(store.unanswered(threads).length, n)
-    assert.equal(store.initialExpand(threads.get('t')), open)
+    assert.equal(store.initialExpand(threads.get('t')!), open)
   }
 })
 

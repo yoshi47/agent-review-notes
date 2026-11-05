@@ -14,10 +14,12 @@
   "engines": {
     "vscode": "^1.90.0"
   },
-  "main": "./extension.js",
+  "main": "./out/extension.js",
   "scripts": {
-    "test": "node --test *.test.js bin/*.test.js",
-    "test:vscode": "node test/run.js"
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "test": "npm run compile && node --test out/*.test.js out/bin/*.test.js",
+    "test:vscode": "npm run compile && node out/test/run.js"
   },
   "activationEvents": [
     "onStartupFinished"
@@ -208,6 +210,9 @@
     }
   },
   "devDependencies": {
-    "@vscode/test-electron": "^3.1.0"
+    "@types/node": "^20.19.43",
+    "@types/vscode": "~1.90.0",
+    "@vscode/test-electron": "^3.1.0",
+    "typescript": "^7.0.2"
   }
 }
