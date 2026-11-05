@@ -1,6 +1,6 @@
 {
-  "name": "review-notes",
-  "displayName": "Review Notes",
+  "name": "agent-review-notes",
+  "displayName": "Agent Review Notes",
   "description": "Read a pull request with your AI agent: ordered explanation cards and line-by-line Q&A threads on the diff",
   "version": "0.1.0",
   "publisher": "yoshi47",
@@ -12,7 +12,7 @@
     "url": "https://github.com/yoshi47/review-notes"
   },
   "engines": {
-    "vscode": "^1.90.0"
+    "vscode": "^1.80.0"
   },
   "main": "./out/extension.js",
   "scripts": {
@@ -26,7 +26,7 @@
   ],
   "contributes": {
     "configuration": {
-      "title": "Review Notes",
+      "title": "Agent Review Notes",
       "properties": {
         "reviewNotes.openInDiff": {
           "type": "boolean",
@@ -45,73 +45,73 @@
       {
         "command": "reviewNotes.create",
         "title": "Comment",
-        "category": "Review Notes"
+        "category": "Agent Review Notes"
       },
       {
         "command": "reviewNotes.reply",
         "title": "Reply",
-        "category": "Review Notes"
+        "category": "Agent Review Notes"
       },
       {
         "command": "reviewNotes.resolve",
         "title": "Resolve",
-        "category": "Review Notes",
+        "category": "Agent Review Notes",
         "icon": "$(check)"
       },
       {
         "command": "reviewNotes.reopen",
         "title": "Reopen",
-        "category": "Review Notes",
+        "category": "Agent Review Notes",
         "icon": "$(debug-restart)"
       },
       {
         "command": "reviewNotes.markRead",
         "title": "Mark as Read",
-        "category": "Review Notes",
+        "category": "Agent Review Notes",
         "icon": "$(eye)"
       },
       {
         "command": "reviewNotes.markUnread",
         "title": "Mark as Unread",
-        "category": "Review Notes",
+        "category": "Agent Review Notes",
         "icon": "$(eye-closed)"
       },
       {
         "command": "reviewNotes.nextCard",
         "title": "Next Card",
-        "category": "Review Notes"
+        "category": "Agent Review Notes"
       },
       {
         "command": "reviewNotes.prevCard",
         "title": "Previous Card",
-        "category": "Review Notes"
+        "category": "Agent Review Notes"
       },
       {
         "command": "reviewNotes.nextUnread",
         "title": "Next Unread Card",
-        "category": "Review Notes"
+        "category": "Agent Review Notes"
       },
       {
         "command": "reviewNotes.hideRead",
         "title": "Hide Read Cards",
-        "category": "Review Notes",
+        "category": "Agent Review Notes",
         "icon": "$(filter)"
       },
       {
         "command": "reviewNotes.showRead",
         "title": "Show Read Cards",
-        "category": "Review Notes",
+        "category": "Agent Review Notes",
         "icon": "$(filter-filled)"
       },
       {
         "command": "reviewNotes.revealCard",
         "title": "Open Card",
-        "category": "Review Notes"
+        "category": "Agent Review Notes"
       },
       {
         "command": "reviewNotes.copyCliCommand",
         "title": "Copy CLI Command",
-        "category": "Review Notes"
+        "category": "Agent Review Notes"
       }
     ],
     "menus": {
@@ -204,14 +204,14 @@
       "scm": [
         {
           "id": "reviewNotes.cards",
-          "name": "Review Notes"
+          "name": "Agent Review Notes"
         }
       ]
     }
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
-    "@types/vscode": "~1.90.0",
+    "@types/vscode": "~1.80.0",
     "@vscode/test-electron": "^3.1.0",
     "typescript": "^7.0.2"
   }

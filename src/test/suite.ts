@@ -185,7 +185,7 @@ test('next card marks the card being left as read and moves on', async () => {
 test('copy CLI command puts a runnable node command for the bundled CLI on the clipboard', async () => {
   await vscode.commands.executeCommand('reviewNotes.copyCliCommand')
   const copied = await vscode.env.clipboard.readText()
-  const cli = path.join(vscode.extensions.getExtension('yoshi47.review-notes')!.extensionPath, 'out', 'bin', 'review-notes.js')
+  const cli = path.join(vscode.extensions.getExtension('yoshi47.agent-review-notes')!.extensionPath, 'out', 'bin', 'review-notes.js')
   assert.equal(copied, `node "${cli}"`)
   // The extension host's own binary runs as Node with this flag, so the test
   // does not depend on a node on PATH.
@@ -198,7 +198,7 @@ test('copy CLI command puts a runnable node command for the bundled CLI on the c
 })
 
 export async function run(): Promise<void> {
-  const self = vscode.extensions.getExtension('yoshi47.review-notes')!
+  const self = vscode.extensions.getExtension('yoshi47.agent-review-notes')!
   await self.activate()
   ext = require('../extension')
   const git = vscode.extensions.getExtension('vscode.git')!
