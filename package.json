@@ -22,7 +22,8 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "test": "npm run compile && node --test out/*.test.js out/bin/*.test.js",
-    "test:vscode": "npm run compile && node out/test/run.js"
+    "test:vscode": "npm run compile && node out/test/run.js",
+    "changeset:version": "changeset version && npm install --package-lock-only"
   },
   "activationEvents": [
     "onStartupFinished"
