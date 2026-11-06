@@ -92,6 +92,16 @@ export function append(file: string, events: NewEvent[]): LogEvent[] {
   return full
 }
 
+// Moves the log to review-notes.<label>.jsonl next to it and returns that path,
+// or undefined when there is no log yet.
+export function archive(file: string, label: string): string | undefined {
+  if (!fs.existsSync(file)) return undefined
+  const to = path.join(path.dirname(file), `review-notes.${label}.jsonl`)
+  if (fs.existsSync(to)) throw new Error(`${to} already exists`)
+  fs.renameSync(file, to)
+  return to
+}
+
 // Lines are only parsed, not validated: a hand-edited log can hold anything,
 // so readers of the folded threads still check the fields they rely on.
 export function read(file: string): LogEvent[] {

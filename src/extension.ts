@@ -261,6 +261,45 @@ function onThread(
   if (write(repo, [{ type, by: 'human', thread: id }])) render(repo)
 }
 
+async function archiveReview(): Promise<void> {
+  const withThreads = [...repos.values()].filter((r) => r.threads.size)
+  if (!withThreads.length) {
+    vscode.window.showInformationMessage('Agent Review Notes: nothing to archive')
+    return
+  }
+  const editor = vscode.window.activeTextEditor
+  const here = editor && locate(editor.document.uri)?.repo
+  let repo = here && withThreads.includes(here) ? here : withThreads[0]
+  if (withThreads.length > 1 && !(here && withThreads.includes(here))) {
+    const picked = await vscode.window.showQuickPick(
+      withThreads.map((r) => ({ label: path.basename(r.top), description: r.top, repo: r })),
+      { placeHolder: 'Repository to archive the review of' },
+    )
+    if (!picked) return
+    repo = picked.repo
+  }
+  const n = repo.threads.size
+  const label = new Date().toISOString().replace(/[:.]/g, '-')
+  const ok = await vscode.window.showWarningMessage(
+    `Archive ${n} thread${n === 1 ? '' : 's'} in ${path.basename(repo.top)}?`,
+    {
+      modal: true,
+      detail: `They disappear from the editor. The log is kept as review-notes.${label}.jsonl in the git directory.`,
+    },
+    'Archive',
+  )
+  if (ok !== 'Archive') return
+  try {
+    store.archive(repo.log, label)
+  } catch (e) {
+    vscode.window.showErrorMessage(
+      `Agent Review Notes: could not archive (${e instanceof Error ? e.message : String(e)})`,
+    )
+    return
+  }
+  render(repo)
+}
+
 function addFolder(folder: vscode.WorkspaceFolder): void {
   let found: { top: string; log: string }
   try {
@@ -355,6 +394,7 @@ export function activate(ctx: vscode.ExtensionContext): void {
       await vscode.env.clipboard.writeText(cli)
       vscode.window.showInformationMessage(`Copied: ${cli}`)
     }),
+    vscode.commands.registerCommand('reviewNotes.archive', archiveReview),
   )
   setupCards(ctx)
   for (const folder of vscode.workspace.workspaceFolders ?? [])

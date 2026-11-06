@@ -6,6 +6,7 @@
 
 import * as assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
+import * as fs from 'node:fs'
 import * as path from 'node:path'
 import * as vscode from 'vscode'
 
@@ -76,6 +77,7 @@ test('a comment written on the left side is stored as the old side', async () =>
     uri: left.document.uri,
     range: new vscode.Range(6, 0, 6, 0),
     comments: [],
+    dispose() {},
   }
   await vscode.commands.executeCommand('reviewNotes.create', {
     thread,
@@ -195,6 +197,25 @@ test('copy CLI command puts a runnable node command for the bundled CLI on the c
   })
   assert.equal(r.status, 0, r.stderr)
   assert.ok(Array.isArray(JSON.parse(r.stdout)))
+})
+
+// Last: it empties the log the other tests share.
+test('archive review moves the log aside and clears every thread', async () => {
+  const shown = [...repo.native.values()]
+  assert.ok(shown.length)
+  const win = vscode.window as { showWarningMessage: unknown }
+  const original = win.showWarningMessage
+  // The modal confirmation would block the test; answer it as the user would.
+  win.showWarningMessage = async () => 'Archive'
+  try {
+    await vscode.commands.executeCommand('reviewNotes.archive')
+  } finally {
+    win.showWarningMessage = original
+  }
+  assert.equal(repo.threads.size, 0)
+  assert.equal(repo.native.size, 0)
+  const dir = path.dirname(repo.log)
+  assert.ok(fs.readdirSync(dir).some((f) => /^review-notes\..+\.jsonl$/.test(f)))
 })
 
 export async function run(): Promise<void> {

@@ -115,6 +115,11 @@
         "command": "reviewNotes.copyCliCommand",
         "title": "Copy CLI Command",
         "category": "Agent Review Notes"
+      },
+      {
+        "command": "reviewNotes.archive",
+        "title": "Archive Review",
+        "category": "Agent Review Notes"
       }
     ],
     "menus": {

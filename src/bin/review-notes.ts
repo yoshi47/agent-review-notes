@@ -11,7 +11,6 @@
 
 import { execFileSync } from 'node:child_process'
 import * as fs from 'node:fs'
-import * as path from 'node:path'
 import { parseArgs } from 'node:util'
 
 import * as store from '../store'
@@ -141,14 +140,13 @@ function main(): void {
 
   if (command === 'archive') {
     if (!values.label) fail(2, USAGE)
-    if (!fs.existsSync(repo.log)) return print({ archived: null })
-    const to = path.join(
-      path.dirname(repo.log),
-      `review-notes.${values.label}.jsonl`,
-    )
-    if (fs.existsSync(to)) fail(1, `${to} already exists`)
-    fs.renameSync(repo.log, to)
-    return print({ archived: to })
+    let to: string | undefined
+    try {
+      to = store.archive(repo.log, values.label)
+    } catch (e) {
+      fail(1, errorOf(e))
+    }
+    return print({ archived: to ?? null })
   }
 
   fail(2, USAGE)

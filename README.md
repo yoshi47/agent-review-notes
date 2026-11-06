@@ -54,6 +54,7 @@ code --install-extension review-notes.vsix
 - Status bar: shows `Cards N unread / M`. Click it to go to the next unread card
 - Asking: click `+` next to a line number, write your question, and send it with Cmd+Enter (Ctrl+Enter)
 - Moving between threads in one file: VS Code's Alt+F9 / Shift+Alt+F9
+- Clearing a review: Archive Review in the Command Palette removes every card and thread at once, after a confirmation. The log is renamed to `review-notes.<date and time>.jsonl` in the git directory, like the CLI's `archive`
 
 A thread opens when it is your turn to read: when the agent has posted or replied last and it is not resolved. Threads waiting for the agent stay collapsed.
 
