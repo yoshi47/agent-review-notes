@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 - 2026-11-07
+
+- Added this changelog
+
 ## 0.2.0 - 2026-11-06
 
 - Added Archive Review to the Command Palette. It removes every card and thread at once, after a confirmation, and keeps the old log as `review-notes.<date and time>.jsonl` in the git directory
