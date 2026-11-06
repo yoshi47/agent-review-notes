@@ -2,7 +2,7 @@
   "name": "agent-review-notes",
   "displayName": "Agent Review Notes",
   "description": "Read a pull request with your AI agent: ordered explanation cards and line-by-line Q&A threads on the diff",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "publisher": "yoshi47",
   "icon": "media/icon.png",
   "categories": [
