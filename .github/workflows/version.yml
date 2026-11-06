@@ -28,10 +28,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # changeset version leaves package-lock.json at the old version.
+      # The action runs version-script without a shell, so the lock update that
+      # changeset version leaves out lives in an npm script.
       - name: Open the Version Packages PR
         uses: changesets/action@v2
         with:
-          version-script: npx changeset version && npm install --package-lock-only
+          version-script: npm run changeset:version
           commit-message: Version Packages
           pr-title: Version Packages
