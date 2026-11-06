@@ -32,6 +32,20 @@ test('append after an unterminated fragment keeps the new event readable', () =>
   assert.deepEqual(store.read(f), [e])
 })
 
+test('archive renames the log by label, and refuses to overwrite an archive', () => {
+  const d = tmp()
+  const f = logIn(d)
+  assert.equal(store.archive(f, 'r1'), undefined)
+  store.append(f, [{ type: 'add', by: 'agent', path: 'a.ts', line: 1, body: 'x' }])
+  const to = store.archive(f, 'r1')
+  assert.equal(to, path.join(d, 'review-notes.r1.jsonl'))
+  assert.equal(fs.existsSync(f), false)
+  assert.equal(store.read(to!).length, 1)
+  store.append(f, [{ type: 'add', by: 'agent', path: 'b.ts', line: 1, body: 'y' }])
+  assert.throws(() => store.archive(f, 'r1'), /already exists/)
+  assert.equal(store.read(f).length, 1)
+})
+
 test('read ignores a trailing fragment that has no newline yet', () => {
   const f = logIn(tmp())
   const [e] = store.append(f, [
