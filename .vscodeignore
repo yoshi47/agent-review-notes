@@ -8,5 +8,6 @@ node_modules
 package-lock.json
 media/icon.svg
 docs
+.changeset
 .github
 .gitignore
