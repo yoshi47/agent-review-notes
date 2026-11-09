@@ -42,6 +42,16 @@
           "default": 2,
           "minimum": 0,
           "description": "Seconds of quiet after AI writes before notifying"
+        },
+        "reviewNotes.collapseOnRead": {
+          "type": "boolean",
+          "default": true,
+          "description": "Collapse a card when it is marked as read"
+        },
+        "reviewNotes.collapseOnResolve": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Collapse a thread when it is resolved, even where VS Code would not. When off, `#comments.collapseOnResolve#` decides"
         }
       }
     },

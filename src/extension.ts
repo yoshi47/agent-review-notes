@@ -150,7 +150,12 @@ export function render(repo: Repo): void {
     }
     // A card just marked read is done: fold it so the next one stands out.
     const was = repo.threads.get(id)
-    if (was && !was.read && t.read) collapse(n)
+    if (was && !was.read && t.read && config().get('collapseOnRead', true))
+      collapse(n)
+    // VS Code folds a resolved thread itself under comments.collapseOnResolve
+    // and does so after any state this sends, so off cannot keep it open.
+    if (was && !was.resolved && t.resolved && config().get('collapseOnResolve', false))
+      collapse(n)
     repo.sig.set(id, sig)
     const card =
       t.card === undefined ? '' : t.read ? '-card-read' : '-card-unread'
