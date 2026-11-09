@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0
+
+### Minor Changes
+
+- Added the collapseOnRead and collapseOnResolve settings to choose whether reading a card or resolving a thread collapses it
+
+### Patch Changes
+
+- Added this changelog
+
 ## 0.2.0
 
 ### Minor Changes
