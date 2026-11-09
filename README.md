@@ -140,6 +140,8 @@ The state is rebuilt by reading the log from the top. Writers only append. A tra
 |---|---|---|
 | `reviewNotes.openInDiff` | `true` | Open the Source Control diff when jumping to a thread. Turn off to use the plain editor |
 | `reviewNotes.notifyDelaySeconds` | `2` | Seconds of quiet after the agent writes before notifying, so a batch shows one notification |
+| `reviewNotes.collapseOnRead` | `true` | Collapse a card when it is marked as read |
+| `reviewNotes.collapseOnResolve` | `false` | Collapse a thread when it is resolved, even on VS Code 1.80 to 1.82 or with `comments.collapseOnResolve` off. When this is off, VS Code's `comments.collapseOnResolve` decides. To keep resolved threads open, turn that one off |
 
 ## Limitations
 

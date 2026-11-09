@@ -132,6 +132,36 @@ test('the thread title buttons log resolve, reopen, read and unread', async () =
   await press('reviewNotes.reopen', 'reopen', 'unresolved-card-unread', Unresolved)
 })
 
+test('marking read and resolving collapse a thread only as the settings say', async () => {
+  const settings = vscode.workspace.getConfiguration('reviewNotes')
+  const set = (key: string, v: boolean | undefined) =>
+    settings.update(key, v, vscode.ConfigurationTarget.Global)
+  const { Expanded, Collapsed } = vscode.CommentThreadCollapsibleState
+  // Checked right after the command, before VS Code's own collapse on resolve
+  // can come back from the workbench.
+  const after = async (command: string, card: number | undefined, line: number) => {
+    const [e] = store.append(repo.log, [
+      { type: 'add', by: 'agent', path: 'a.ts', line, body: 'w', ...(card ? { card } : {}) },
+    ])
+    ext.render(repo)
+    const n = repo.native.get(e.id)!
+    assert.equal(n.collapsibleState, Expanded)
+    await vscode.commands.executeCommand(command, n)
+    return n.collapsibleState
+  }
+  try {
+    assert.equal(await after('reviewNotes.markRead', 3, 8), Collapsed)
+    await set('collapseOnRead', false)
+    assert.equal(await after('reviewNotes.markRead', 4, 9), Expanded)
+    assert.equal(await after('reviewNotes.resolve', undefined, 10), Expanded)
+    await set('collapseOnResolve', true)
+    assert.equal(await after('reviewNotes.resolve', undefined, 11), Collapsed)
+  } finally {
+    await set('collapseOnRead', undefined)
+    await set('collapseOnResolve', undefined)
+  }
+})
+
 test('a reply is logged as human, and a blank one is not logged', async () => {
   const [e] = store.append(repo.log, [
     { type: 'add', by: 'agent', path: 'a.ts', line: 3, body: 'z' },
