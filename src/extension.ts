@@ -105,7 +105,7 @@ function toComments(t: Thread): vscode.Comment[] {
 
 function label(t: Thread): string | undefined {
   if (t.card !== undefined) return `Card ${t.card}`
-  if (!t.resolved && store.lastBy(t) === 'human') return 'Waiting for AI'
+  if (store.waiting(t)) return 'Waiting for AI'
   return undefined
 }
 

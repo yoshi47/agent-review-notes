@@ -147,6 +147,34 @@ test('unanswered and initialExpand follow whose turn it is', () => {
   }
 })
 
+test('an agent reply answers only up to the post it saw', () => {
+  const add = ev('add', { id: 't', path: 'a', line: 1, body: 'q1' })
+  const q2 = ev('reply', { id: 'q2', thread: 't', body: 'q2' })
+  const waiting = (...events: LogEvent[]) =>
+    store.waiting(store.fold(events).get('t')!)
+  const answer = (seen?: string) =>
+    ev('reply', { id: 'a', by: 'agent', thread: 't', body: 'a', seen })
+  // The human added q2 while the agent was answering q1.
+  assert.equal(waiting(add, q2, answer('t')), true)
+  assert.equal(waiting(add, q2, answer('q2')), false)
+  // A reply without seen, as older agents write it, answers everything before it.
+  assert.equal(waiting(add, q2, answer()), false)
+  // A later reply that saw q2 settles the thread.
+  assert.equal(
+    waiting(
+      add,
+      q2,
+      answer('t'),
+      ev('reply', { id: 'b', by: 'agent', thread: 't', body: 'b', seen: 'q2' }),
+    ),
+    false,
+  )
+  // A seen that is not an earlier post in the thread counts as no seen.
+  assert.equal(waiting(add, q2, answer('gone')), false)
+  const read = store.fold([add, q2, answer('t')]).get('t')!
+  assert.equal(read.replies[1].seen, 't')
+})
+
 test('fresh returns events after the saved mark, or all when the log changed', () => {
   const es = ['a', 'b', 'c'].map((id) => ({ id }))
   assert.deepEqual(store.fresh(es, undefined).news, es)

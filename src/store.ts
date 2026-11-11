@@ -23,7 +23,7 @@ export interface AddFields {
 
 export type NewEvent = { by: By } & (
   | ({ type: 'add' } & AddFields)
-  | { type: 'reply'; thread: string; body: string }
+  | { type: 'reply'; thread: string; body: string; seen?: string }
   | {
       type: 'resolve' | 'reopen' | 'read' | 'unread' | 'focus'
       thread: string
@@ -37,6 +37,7 @@ export interface Reply {
   by: By
   at: string
   body: string
+  seen?: string
 }
 
 export interface Thread extends AddFields {
@@ -133,9 +134,11 @@ export function fold(events: LogEvent[]): Map<string, Thread> {
     }
     const t = threads.get(e.thread)
     if (!t) continue
-    if (e.type === 'reply')
-      t.replies.push({ id: e.id, by: e.by, at: e.at, body: e.body })
-    else if (e.type === 'resolve') t.resolved = true
+    if (e.type === 'reply') {
+      const r: Reply = { id: e.id, by: e.by, at: e.at, body: e.body }
+      if (e.seen !== undefined) r.seen = e.seen
+      t.replies.push(r)
+    } else if (e.type === 'resolve') t.resolved = true
     else if (e.type === 'reopen') t.resolved = false
     else if (e.type === 'read') t.read = true
     else if (e.type === 'unread') t.read = false
@@ -145,8 +148,28 @@ export function fold(events: LogEvent[]): Map<string, Thread> {
 
 export const lastBy = (t: Thread): By => (t.replies.at(-1) ?? t).by
 
+// An agent reply answers what the agent had read when it wrote, named by
+// `seen`, not everything before it: the human may add to the thread while the
+// agent is still writing, and judging by the last writer alone would bury that.
+// A reply without `seen` answers everything before it.
+export function waiting(t: Thread): boolean {
+  if (t.resolved) return false
+  // Positions: 0 is the thread itself, i + 1 is replies[i].
+  const ids = [t.id, ...t.replies.map((r) => r.id)]
+  let asked = t.by === 'human' ? 0 : -1
+  let answered = -1
+  t.replies.forEach((r, i) => {
+    if (r.by === 'human') asked = i + 1
+    else {
+      const seen = r.seen === undefined ? -1 : ids.indexOf(r.seen)
+      answered = Math.max(answered, seen >= 0 && seen <= i ? seen : i)
+    }
+  })
+  return asked > answered
+}
+
 export const unanswered = (threads: Map<string, Thread>): Thread[] =>
-  [...threads.values()].filter((t) => !t.resolved && lastBy(t) === 'human')
+  [...threads.values()].filter(waiting)
 
 export const initialExpand = (t: Thread): boolean =>
   !t.resolved && lastBy(t) === 'agent'

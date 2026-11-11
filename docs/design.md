@@ -31,7 +31,7 @@ VS Code のコメント拡張と、AI エージェントが書き込む CLI。�
   - APFS で、別プロセスからの同時追記（1行約100KB × 600行）が混ざらないことを確かめた（2026-10-30）
 - イベント（共通: `id`、`at`（ISO 時刻）、`by`（`human` / `agent`））:
   - `add`: 新しいスレッド。`path`（リポジトリからの相対パス）、`line`（1 始まり）、`body`、任意で `card`（カードの順番、1 から）と `side`（`old` なら差分の古い側。無ければ新しい側）
-  - `reply`: `thread`（親の id）、`body`
+  - `reply`: `thread`（親の id）、`body`、任意で `seen`（agent が書く前に読んだ、そのスレッドの最後の書き込みの id）
   - `resolve` / `reopen`: `thread`
   - `read` / `unread`: `thread`（カードの既読）
   - `focus`: `thread`（AI が「ここを開いて」と頼む）
@@ -41,10 +41,12 @@ VS Code のコメント拡張と、AI エージェントが書き込む CLI。�
 
 拡張に同梱する Node スクリプト（`src/bin/review-notes.ts` をコンパイルした `out/bin/review-notes.js`）。`--workspace <dir>` で対象のリポジトリ（worktree）を指す。
 
-- `post <entries.json>`: エントリの配列をまとめて1回で追記する。エントリは `{path, line, body, card?, side?}`（新しいスレッド）か `{reply_to, body}`（返信）。`side: 'old'` は差分の古い側（HEAD）で、`path` は HEAD にあればよい（作業ツリーで消えたファイルにも置ける）。`side` が `old` / `new` 以外、新しい側で `<toplevel>/<path>` が無い、古い側で `HEAD:<path>` が無い、`reply_to` のスレッドが無い、などのエントリは書かずに `{error}` にする。stdout は入力順の `[{id} | {error}]`、exit は 0 = 全件、1 = 一部失敗、2 = 使い方の誤り
+- `post <entries.json>`: エントリの配列をまとめて1回で追記する。エントリは `{path, line, body, card?, side?}`（新しいスレッド）か `{reply_to, body, seen?}`（返信）。`seen` がそのスレッドの書き込みの id でなければエラーにする。`side: 'old'` は差分の古い側（HEAD）で、`path` は HEAD にあればよい（作業ツリーで消えたファイルにも置ける）。`side` が `old` / `new` 以外、新しい側で `<toplevel>/<path>` が無い、古い側で `HEAD:<path>` が無い、`reply_to` のスレッドが無い、などのエントリは書かずに `{error}` にする。stdout は入力順の `[{id} | {error}]`、exit は 0 = 全件、1 = 一部失敗、2 = 使い方の誤り
 - `focus --thread <id>`
 - `archive --label <ラベル>`: ログを `review-notes.<ラベル>.jsonl` に名前を変えて退避する（無ければ何もしない）。前の回のスレッドを画面から消し、新しい回を始めるときに使う。前の回のスレッドはファイルに残る
-- `list [--unanswered]`: 畳み込んだスレッドを JSON で出す。`--unanswered` は、解決されておらず最後の書き込みが human のもの
+- `list [--unanswered]`: 畳み込んだスレッドを JSON で出す。`--unanswered` は、解決されておらず、agent の返信がまだ答えていない human の書き込みがあるもの
+  - agent の返信は、`seen` の書き込みまでに答えたものとする。`seen` が無い返信は、それより前の全部に答えたものとする
+  - 最後の書き込みが誰かだけで決めると、agent が返信を書いている間に human が足した書き込みが、その返信で回答済みに埋もれる
 - 本文は JSON の中に入れる。シェルの引数に載せない
 
 ## 拡張の振る舞い

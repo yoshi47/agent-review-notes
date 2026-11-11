@@ -137,6 +137,48 @@ test('list --unanswered shows threads whose last word is human', () => {
   assert.equal(list(d, '--unanswered').length, 1)
 })
 
+test('a reply written before a human follow-up leaves the thread unanswered', () => {
+  const d = repo()
+  const log = store.repoOf(d).log
+  const [q1] = store.append(log, [
+    { type: 'add', by: 'human', path: 'a b.ts', line: 1, body: 'q1' },
+  ])
+  const [q2] = store.append(log, [
+    { type: 'reply', by: 'human', thread: q1.id, body: 'q2' },
+  ])
+  const r = run(d, ['post'], [{ reply_to: q1.id, body: 'a1', seen: q1.id }])
+  assert.equal(r.status, 0, r.stderr)
+  const [t] = list(d, '--unanswered')
+  assert.equal(t.id, q1.id)
+  assert.equal(t.replies.at(-1).seen, q1.id)
+  run(d, ['post'], [{ reply_to: q1.id, body: 'a2', seen: q2.id }])
+  assert.equal(list(d, '--unanswered').length, 0)
+})
+
+test('a seen outside the thread is an entry error', () => {
+  const d = repo()
+  const [a, b] = run(
+    d,
+    ['post'],
+    [
+      { path: 'a b.ts', line: 1, body: 'one' },
+      { path: 'a b.ts', line: 2, body: 'two' },
+    ],
+  ).out
+  const r = run(
+    d,
+    ['post'],
+    [
+      { reply_to: a.id, body: 'x', seen: b.id },
+      { reply_to: a.id, body: 'y', seen: 5 },
+    ],
+  )
+  assert.equal(r.status, 1, r.stderr)
+  assert.ok(r.out[0].error)
+  assert.ok(r.out[1].error)
+  assert.equal(list(d)[0].replies.length, 0)
+})
+
 test('focus needs an existing thread', () => {
   const d = repo()
   const [{ id }] = run(
