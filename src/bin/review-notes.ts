@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // review-notes --workspace <dir> post <entries.json>
-//   entries: [{path, line, body, card?, side?} | {reply_to, body}]; written as
-//   agent in one append. side 'old' targets the HEAD side of the diff.
+//   entries: [{path, line, body, card?, side?} | {reply_to, body, seen?}];
+//   written as agent in one append. side 'old' targets the HEAD side of the
+//   diff. seen is the id of the last post in the thread the reply answers.
 //   stdout: [{id} | {error}] in input order
 // review-notes --workspace <dir> focus --thread <id>
 // review-notes --workspace <dir> list [--unanswered]
@@ -50,8 +51,20 @@ function toEvent(
   const body = typeof e.body === 'string' ? e.body : ''
   if (e.reply_to) {
     const thread = String(e.reply_to)
-    if (!threads.has(thread)) return { error: `no thread ${thread}` }
-    return { type: 'reply', by: 'agent', thread, body }
+    const t = threads.get(thread)
+    if (!t) return { error: `no thread ${thread}` }
+    const reply: Extract<store.NewEvent, { type: 'reply' }> = {
+      type: 'reply',
+      by: 'agent',
+      thread,
+      body,
+    }
+    if (e.seen !== undefined) {
+      if (typeof e.seen !== 'string' || ![t, ...t.replies].some((p) => p.id === e.seen))
+        return { error: `seen ${JSON.stringify(e.seen)} is not in thread ${thread}` }
+      reply.seen = e.seen
+    }
+    return reply
   }
   const { path: rel, line, side, card } = e
   if (typeof rel !== 'string' || !rel || !Number.isInteger(line) || (line as number) < 1)

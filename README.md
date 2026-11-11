@@ -74,7 +74,7 @@ node "$CLI" --workspace <repo-or-worktree> <command>
 |---|---|
 | `post <entries.json>` | Appends cards, comments and replies in one write |
 | `focus --thread <id>` | Asks VS Code to open that thread |
-| `list [--unanswered]` | Prints all threads, or the open ones where you wrote last |
+| `list [--unanswered]` | Prints all threads, or the open ones with a post of yours the agent has not answered |
 | `archive --label <label>` | Renames the log to `review-notes.<label>.jsonl` to start a new round |
 
 `post` reads a JSON array. Each entry is either a new thread or a reply:
@@ -83,7 +83,7 @@ node "$CLI" --workspace <repo-or-worktree> <command>
 [
   { "path": "src/auth.ts", "line": 42, "card": 1, "body": "This is where the token is checked." },
   { "path": "src/legacy.ts", "line": 10, "side": "old", "body": "This function was removed." },
-  { "reply_to": "<thread id>", "body": "It is called from the login handler." }
+  { "reply_to": "<thread id>", "seen": "<last post id read>", "body": "It is called from the login handler." }
 ]
 ```
 
@@ -92,6 +92,7 @@ node "$CLI" --workspace <repo-or-worktree> <command>
 - `card`: optional reading order, starting at 1
 - `side`: `new` (default) or `old`. On the old side, `path` must exist at `HEAD`, so it works for deleted files
 - `body`: Markdown
+- `seen`: optional, on a reply. The id of the last post in the thread you read before writing: the thread's own `id`, or a reply's `id`. If you leave it out, the reply counts as answering everything before it
 
 It prints one result per entry, in input order: `{"id": "..."}` or `{"error": "..."}`. An entry with an error is not written.
 
@@ -106,8 +107,8 @@ Put the body in the JSON file rather than in shell arguments, so quoting never b
 ### A typical agent loop
 
 1. Optionally, `post` cards and `focus` the first one
-2. Poll `list --unanswered` every few seconds. It returns the open threads where you wrote last
-3. `post` a reply to each one. The thread drops out of `list --unanswered` until you write again
+2. Poll `list --unanswered` every few seconds. It returns the open threads with a post of yours the agent has not answered
+3. Read the whole thread, then `post` a reply with `seen` set to the last post you read. The thread drops out of `list --unanswered` until you write again. If you wrote again while the agent was answering, the thread stays in the list, so the next poll picks up the new post
 
 For example, to print a line whenever the set of unanswered threads changes:
 
@@ -127,7 +128,7 @@ One JSON object per line. Every event has `id`, `at` (ISO time) and `by` (`human
 | `type` | Fields |
 |---|---|
 | `add` | `path`, `line`, `body`, optional `card` and `side` |
-| `reply` | `thread`, `body` |
+| `reply` | `thread`, `body`, optional `seen` |
 | `resolve` / `reopen` | `thread` |
 | `read` / `unread` | `thread` |
 | `focus` | `thread` |
