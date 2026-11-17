@@ -246,3 +246,24 @@ test('baseOf maps a sub-folder or a symlinked folder onto the repository top', (
     path.join(d, 'link'),
   )
 })
+
+test('position follows a saved snapshot, and stays on line without one', () => {
+  const d = fs.realpathSync(tmp())
+  execFileSync('git', ['init', '-q', d])
+  const blob = store.saveBlob(d, { text: 'a\nb\nc\n' })
+  assert.ok(blob)
+  assert.equal(store.readBlob(d, blob), 'a\nb\nc\n')
+  assert.deepEqual(store.position(d, { line: 2, blob }, 'new\na\nb\nc\n'), {
+    line: 3,
+    changed: false,
+  })
+  assert.deepEqual(store.position(d, { line: 2 }, 'new\na\nb\nc\n'), {
+    line: 2,
+    changed: false,
+  })
+  const missing = '0'.repeat(40)
+  assert.deepEqual(store.position(d, { line: 2, blob: missing }, 'x\n'), {
+    line: 2,
+    changed: false,
+  })
+})

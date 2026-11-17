@@ -8,6 +8,8 @@ import * as crypto from 'node:crypto'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
+import { type Followed, follow, linesOf } from './anchor'
+
 const LOG = 'review-notes.jsonl'
 
 export type By = 'human' | 'agent'
@@ -19,6 +21,7 @@ export interface AddFields {
   body: string
   card?: number
   side?: 'old'
+  blob?: string // the file as it was when `line` was counted
 }
 
 export type NewEvent = { by: By } & (
@@ -186,6 +189,75 @@ export function fresh<E extends { id: string }>(
     news: known ? events.slice(mark.count) : events,
     mark: { count: events.length, lastId: events.at(-1)?.id },
   }
+}
+
+// Snapshots go into the object database rather than the log or the working
+// tree: the log stays small and git already stores identical contents once.
+// Any git failure only means the thread does not follow edits.
+function git(top: string, args: string[], input?: string): string | undefined {
+  try {
+    return execFileSync('git', ['-C', top, ...args], {
+      encoding: 'utf8',
+      input,
+      maxBuffer: 256 * 1024 * 1024,
+      stdio: ['pipe', 'pipe', 'ignore'],
+    })
+  } catch {
+    return undefined
+  }
+}
+
+// --no-filters keeps the bytes as they are on disk or in the editor, which is
+// what later texts are compared with.
+export function saveBlob(
+  top: string,
+  from: { path: string } | { text: string },
+): string | undefined {
+  const out =
+    'text' in from
+      ? git(top, ['hash-object', '-w', '--no-filters', '--stdin'], from.text)
+      : git(top, ['hash-object', '-w', '--no-filters', '--', absPath(top, from.path)])
+  return out?.trim() || undefined
+}
+
+// The old side is what the git extension puts on the left of the working-tree
+// diff: the index for a file still in the working tree, HEAD for a deleted one.
+export function oldSideBlob(top: string, rel: string): string | undefined {
+  const ref = fs.existsSync(absPath(top, rel)) ? `:${rel}` : `HEAD:${rel}`
+  return git(top, ['rev-parse', '--verify', '-q', ref])?.trim() || undefined
+}
+
+const blobs = new Map<string, string | undefined>()
+
+export function readBlob(top: string, id: string): string | undefined {
+  if (!/^[0-9a-f]{40,64}$/.test(id)) return undefined
+  if (!blobs.has(id)) blobs.set(id, git(top, ['cat-file', 'blob', id]))
+  return blobs.get(id)
+}
+
+// The text a thread's side shows now, read from disk or git.
+export function currentText(top: string, t: Pick<Thread, 'path' | 'side'>): string | undefined {
+  if (t.side === 'old') {
+    const id = oldSideBlob(top, t.path)
+    return id && readBlob(top, id)
+  }
+  try {
+    return fs.readFileSync(absPath(top, t.path), 'utf8')
+  } catch {
+    return undefined
+  }
+}
+
+// Threads without a snapshot, or whose snapshot is gone (gc), stay on `line`.
+export function position(
+  top: string,
+  t: Pick<Thread, 'line' | 'blob'>,
+  now: string | undefined,
+): Followed {
+  const then = t.blob === undefined ? undefined : readBlob(top, t.blob)
+  if (then === undefined || now === undefined) return { line: t.line, changed: false }
+  if (then === now) return { line: t.line, changed: false }
+  return follow(linesOf(then), linesOf(now), t.line)
 }
 
 // The base is the repository top as seen through the folder VS Code opened, so

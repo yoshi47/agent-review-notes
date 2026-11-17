@@ -259,3 +259,38 @@ test('a non-string path is an entry error, not a crash', () => {
   assert.equal(r.status, 1, r.stderr)
   assert.ok(r.out[0].error)
 })
+
+test('list reports where a posted line is after the file changes', () => {
+  const d = repo()
+  const f = path.join(d, 'a b.ts')
+  fs.writeFileSync(f, 'one\ntwo\nthree\n')
+  const r = run(
+    d,
+    ['post'],
+    [
+      { path: 'a b.ts', line: 2, body: 'kept' },
+      { path: 'a b.ts', line: 3, body: 'rewritten' },
+    ],
+  )
+  assert.equal(r.status, 0, r.stderr)
+  fs.writeFileSync(f, 'x\ny\nz\none\ntwo\nTHREE\n')
+  assert.deepEqual(
+    list(d).map((t: Out) => [t.body, t.line, t.current_line, t.line_changed]),
+    [
+      ['kept', 2, 5, false],
+      ['rewritten', 3, 6, true],
+    ],
+  )
+})
+
+test('an old-side thread follows the index as it changes', () => {
+  const d = committed()
+  const f = path.join(d, 'a b.ts')
+  fs.writeFileSync(f, 'one\ntwo\n')
+  execFileSync('git', ['-C', d, 'add', 'a b.ts'])
+  run(d, ['post'], [{ path: 'a b.ts', line: 2, body: 'old', side: 'old' }])
+  fs.writeFileSync(f, 'zero\none\ntwo\n')
+  execFileSync('git', ['-C', d, 'add', 'a b.ts'])
+  const [t] = list(d)
+  assert.deepEqual([t.line, t.current_line, t.line_changed], [2, 3, false])
+})
