@@ -6,6 +6,8 @@
 //   stdout: [{id} | {error}] in input order
 // review-notes --workspace <dir> focus --thread <id>
 // review-notes --workspace <dir> list [--unanswered]
+//   each thread also carries current_line (where `line` is now) and
+//   line_changed (that line was edited or removed since)
 // review-notes --workspace <dir> archive --label <label>
 //
 // exit: 0 = ok, 1 = some entries or the target failed, 2 = usage
@@ -76,6 +78,8 @@ function toEvent(
   const add: store.NewEvent = { type: 'add', by: 'agent', path: rel, line: line as number, body }
   if (side === 'old') add.side = 'old'
   if (card !== undefined) add.card = card as number
+  const blob = side === 'old' ? store.oldSideBlob(top, rel) : store.saveBlob(top, { path: rel })
+  if (blob) add.blob = blob
   return add
 }
 
@@ -146,8 +150,19 @@ function main(): void {
 
   if (command === 'list') {
     const threads = store.fold(store.read(repo.log))
+    const picked = values.unanswered
+      ? store.unanswered(threads)
+      : [...threads.values()]
+    // `line` stays as written; where that line is now is what the agent reads.
     return print(
-      values.unanswered ? store.unanswered(threads) : [...threads.values()],
+      picked.map((t) => {
+        const now = store.position(
+          repo.top,
+          t,
+          t.blob === undefined ? undefined : store.currentText(repo.top, t),
+        )
+        return { ...t, current_line: now.line, line_changed: now.changed }
+      }),
     )
   }
 

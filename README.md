@@ -22,6 +22,7 @@ The review lives in `review-notes.jsonl` in the repository's git directory (`git
 - The agent appends events through the CLI
 - The extension watches the file and draws the threads
 - Your actions in VS Code (new threads, replies, resolve, read) are appended to the same file
+- A new thread also saves the file as it is then into git's object database, so the thread can follow its line through later edits
 - Nothing is written to the working tree, and `git worktree remove` deletes the review with the worktree
 
 ## What you can comment on
@@ -74,7 +75,7 @@ node "$CLI" --workspace <repo-or-worktree> <command>
 |---|---|
 | `post <entries.json>` | Appends cards, comments and replies in one write |
 | `focus --thread <id>` | Asks VS Code to open that thread |
-| `list [--unanswered]` | Prints all threads, or the open ones with a post of yours the agent has not answered |
+| `list [--unanswered]` | Prints all threads, or the open ones with a post of yours the agent has not answered. Each thread has `current_line`, where its line is now, and `line_changed` |
 | `archive --label <label>` | Renames the log to `review-notes.<label>.jsonl` to start a new round |
 
 `post` reads a JSON array. Each entry is either a new thread or a reply:
@@ -108,7 +109,7 @@ Put the body in the JSON file rather than in shell arguments, so quoting never b
 
 1. Optionally, `post` cards and `focus` the first one
 2. Poll `list --unanswered` every few seconds. It returns the open threads with a post of yours the agent has not answered
-3. Read the whole thread, then `post` a reply with `seen` set to the last post you read. The thread drops out of `list --unanswered` until you write again. If you wrote again while the agent was answering, the thread stays in the list, so the next poll picks up the new post
+3. Read the whole thread and the code at `current_line` (`line` is where it was written, which edits since then may have moved), then `post` a reply with `seen` set to the last post you read. The thread drops out of `list --unanswered` until you write again. If you wrote again while the agent was answering, the thread stays in the list, so the next poll picks up the new post
 
 For example, to print a line whenever the set of unanswered threads changes:
 
@@ -127,7 +128,7 @@ One JSON object per line. Every event has `id`, `at` (ISO time) and `by` (`human
 
 | `type` | Fields |
 |---|---|
-| `add` | `path`, `line`, `body`, optional `card` and `side` |
+| `add` | `path`, `line`, `body`, optional `card`, `side` and `blob` (the git object id of the file as it was when `line` was counted) |
 | `reply` | `thread`, `body`, optional `seen` |
 | `resolve` / `reopen` | `thread` |
 | `read` / `unread` | `thread` |
@@ -146,7 +147,8 @@ The state is rebuilt by reading the log from the top. Writers only append. A tra
 
 ## Limitations
 
-- Threads do not follow edits. A thread stays on the line number it was written on
+- A thread follows its line by comparing the file with how it was when the thread was written. If that line itself is rewritten or removed, the thread moves to the first line of the change and its title shows `Line changed`. A renamed file is not followed
+- Threads written before 0.5.0, and threads whose snapshot was pruned by `git gc` (unreferenced objects older than two weeks by default), stay on the line number they were written on
 - Old-side threads show only in the Source Control diff of the working tree, not in other `git:` views such as file history
 - If the same worktree is open in two windows, both show the notification
 

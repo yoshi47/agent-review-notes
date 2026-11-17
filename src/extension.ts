@@ -10,7 +10,7 @@ export interface Repo {
   top: string
   log: string
   base: string
-  threads: Map<string, Thread>
+  threads: Map<string, Shown>
   native: Map<string, vscode.CommentThread>
   sig: Map<string, string>
   last?: number
@@ -103,10 +103,51 @@ function toComments(t: Thread): vscode.Comment[] {
   }))
 }
 
-function label(t: Thread): string | undefined {
-  if (t.card !== undefined) return `Card ${t.card}`
-  if (store.waiting(t)) return 'Waiting for AI'
-  return undefined
+// A thread as shown: `line` is where the line it was written on (`written`)
+// is now.
+export type Shown = Thread & { written: number; lineChanged: boolean }
+
+function label(t: Shown): string | undefined {
+  const parts: string[] = []
+  if (t.card !== undefined) parts.push(`Card ${t.card}`)
+  else if (store.waiting(t)) parts.push('Waiting for AI')
+  if (t.lineChanged) parts.push('Line changed')
+  return parts.length ? parts.join(' · ') : undefined
+}
+
+const openDocument = (uri: vscode.Uri) =>
+  vscode.workspace.textDocuments.find((d) => sameUri(d.uri, uri))
+
+// The open document wins over disk: threads are drawn on it, unsaved edits
+// included.
+function place(repo: Repo, t: Thread, texts: Map<string, string | undefined>): Shown {
+  if (t.blob === undefined) return { ...t, written: t.line, lineChanged: false }
+  const uri = uriOf(repo, t)
+  const key = uri.toString()
+  if (!texts.has(key))
+    texts.set(key, openDocument(uri)?.getText() ?? store.currentText(repo.top, t))
+  const now = store.position(repo.top, t, texts.get(key))
+  return { ...t, written: t.line, line: now.line, lineChanged: now.changed }
+}
+
+// Only moves threads whose place changed. A full render() here would re-send
+// every thread while the editor may be opening, and VS Code 1.80 then puts the
+// cursor reveal() just set back to the top.
+function relocate(repo: Repo): void {
+  const texts = new Map<string, string | undefined>()
+  let moved = false
+  for (const [id, t] of repo.threads) {
+    const s = place(repo, { ...t, line: t.written }, texts)
+    if (s.line === t.line && s.lineChanged === t.lineChanged) continue
+    repo.threads.set(id, s)
+    const n = repo.native.get(id)
+    if (n) {
+      n.range = lineRange(s.line)
+      n.label = label(s)
+    }
+    moved = true
+  }
+  if (moved) rendered.fire(repo)
 }
 
 const agentReplies = (t: Thread) =>
@@ -126,15 +167,21 @@ function collapse(native: vscode.CommentThread): void {
 
 export function render(repo: Repo): void {
   const events = store.read(repo.log)
-  const threads = store.fold(events)
-  // One malformed thread (hand-edited log) must not stop the rest from showing.
-  for (const [id, t] of threads) {
-    if (typeof t.path !== 'string' || !Number.isInteger(t.line) || t.line < 1) {
-      threads.delete(id)
+  const threads = new Map<string, Shown>()
+  const texts = new Map<string, string | undefined>()
+  for (const [id, written] of store.fold(events)) {
+    // One malformed thread (hand-edited log) must not stop the rest from showing.
+    if (
+      typeof written.path !== 'string' ||
+      !Number.isInteger(written.line) ||
+      written.line < 1
+    )
       continue
-    }
+    const t = place(repo, written, texts)
+    threads.set(id, t)
     let n = repo.native.get(id)
     const sig = [t.id, ...t.replies.map((r) => r.id)].join(',')
+    if (n && n.range?.start.line !== t.line - 1) n.range = lineRange(t.line)
     if (!n) {
       n = controller.createCommentThread(
         uriOf(repo, t),
@@ -305,6 +352,26 @@ async function archiveReview(): Promise<void> {
   render(repo)
 }
 
+const relocating = new Map<Repo, NodeJS.Timeout>()
+
+function relocateLater(doc: vscode.TextDocument): void {
+  const at = locate(doc.uri)
+  if (!at) return
+  const { repo } = at
+  const has = [...repo.threads.values()].some(
+    (t) => t.path === at.path && (t.side === 'old') === (at.side === 'old'),
+  )
+  if (!has) return
+  clearTimeout(relocating.get(repo))
+  relocating.set(
+    repo,
+    setTimeout(() => {
+      relocating.delete(repo)
+      relocate(repo)
+    }, 300),
+  )
+}
+
 function addFolder(folder: vscode.WorkspaceFolder): void {
   let found: { top: string; log: string }
   try {
@@ -355,6 +422,15 @@ export function activate(ctx: vscode.ExtensionContext): void {
           body: reply.text,
         }
         if (at.side === 'old') add.side = 'old'
+        // The line was counted on what the editor shows, unsaved edits included.
+        const text = openDocument(reply.thread.uri)?.getText()
+        const blob =
+          at.side === 'old'
+            ? store.oldSideBlob(repo.top, at.path)
+            : text === undefined
+              ? store.saveBlob(repo.top, { path: at.path })
+              : store.saveBlob(repo.top, { text })
+        if (blob) add.blob = blob
         const [e] = write(repo, [add]) ?? []
         if (!e) return
         // Keep VS Code's own thread: recreating it would apply the "AI's turn
@@ -400,6 +476,10 @@ export function activate(ctx: vscode.ExtensionContext): void {
       vscode.window.showInformationMessage(`Copied: ${cli}`)
     }),
     vscode.commands.registerCommand('reviewNotes.archive', archiveReview),
+    // The log does not change when the code does, so edits (the agent's on
+    // disk reach an open document as a reload) need their own pass.
+    vscode.workspace.onDidChangeTextDocument((e) => relocateLater(e.document)),
+    vscode.workspace.onDidOpenTextDocument(relocateLater),
   )
   setupCards(ctx)
   for (const folder of vscode.workspace.workspaceFolders ?? [])
@@ -563,5 +643,6 @@ function setupCards(ctx: vscode.ExtensionContext): void {
 
 export function deactivate(): void {
   clearTimeout(timer)
+  for (const t of relocating.values()) clearTimeout(t)
   for (const log of repos.keys()) fs.unwatchFile(log)
 }

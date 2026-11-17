@@ -229,6 +229,45 @@ test('copy CLI command puts a runnable node command for the bundled CLI on the c
   assert.ok(Array.isArray(JSON.parse(r.stdout)))
 })
 
+test('a thread follows its line through editor edits and changes on disk', async () => {
+  const rel = 'follow.ts'
+  fs.writeFileSync(path.join(ws, rel), 'a\nb\nc\nd\n')
+  const doc = await vscode.workspace.openTextDocument(file(rel))
+  await vscode.window.showTextDocument(doc)
+  // Unsaved: the line was counted on what the editor shows, not on disk.
+  const edit = new vscode.WorkspaceEdit()
+  edit.insert(doc.uri, new vscode.Position(0, 0), 'top\n')
+  await vscode.workspace.applyEdit(edit)
+  const thread = {
+    uri: doc.uri,
+    range: new vscode.Range(3, 0, 3, 0),
+    comments: [],
+    dispose() {},
+  }
+  await vscode.commands.executeCommand('reviewNotes.create', { thread, text: 'on c' })
+  assert.equal(last().line, 4)
+  assert.ok(last().blob)
+  const id = last().id as string
+  const at = () => repo.native.get(id)?.range?.start.line
+
+  const more = new vscode.WorkspaceEdit()
+  more.insert(doc.uri, new vscode.Position(0, 0), 'x\ny\n')
+  await vscode.workspace.applyEdit(more)
+  await until('the thread to move down with the edit', () => at() === 5)
+
+  // What the agent does: rewrite the file on disk, which reloads the document.
+  await doc.save()
+  fs.writeFileSync(path.join(ws, rel), 'a\nc\nd\n')
+  await until('the thread to follow the change on disk', () => at() === 1)
+  assert.equal(repo.native.get(id)?.label, 'Waiting for AI')
+
+  fs.writeFileSync(path.join(ws, rel), 'a\nC\nd\n')
+  await until('the thread to mark its line as changed', () =>
+    repo.native.get(id)?.label === 'Waiting for AI · Line changed',
+  )
+  assert.equal(at(), 1)
+})
+
 // Last: it empties the log the other tests share.
 test('archive review moves the log aside and clears every thread', async () => {
   const shown = [...repo.native.values()]
