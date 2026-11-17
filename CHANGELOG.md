@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+
+### Minor Changes
+
+- Threads follow their line when the code changes, and show `Line changed` when that line itself is rewritten. `list` reports where each thread's line is now as `current_line`
+
 ## 0.4.0
 
 ### Minor Changes
